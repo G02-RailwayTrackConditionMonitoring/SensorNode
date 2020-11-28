@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include "NodeBLE.h"
 
-  NodeBLE ble("G02");
+  
 
 void setup(){
 
@@ -14,7 +14,8 @@ void setup(){
   pinMode(PIN_BUTTON1,INPUT_PULLUP);
 
   Serial.println("Starting BLE...");
-  ble.startBLE();
+  
+  BLE_Stack.startBLE("G02");
   
 
 }
@@ -25,8 +26,24 @@ void loop(){
     digitalToggle(LED_BLUE);
   
     if(digitalRead(PIN_BUTTON1) == LOW){
-      Serial.println("Starting Advertising");
-      ble.startAdvertising();
+
+      if(!BLE_Stack.isConnected()){
+        Serial.println("Starting Advertising");
+        BLE_Stack.startAdvertising();
+      }
+      else{
+        
+        int8_t rssi = BLE_Stack.getRSSI();
+        uint8_t phy = BLE_Stack.getPHY();
+        uint16_t mtu = BLE_Stack.getMTU();
+
+        char message[60];
+        snprintf(message,60,"Msg from sensor node: rssi:%d phy:%d mtu:%d\n",rssi,phy,mtu);
+        
+        Serial.printf("Sending the messge: %s",message);
+        BLE_Stack.sendData(message,strlen(message));
+      }
+
 
     }
     delay(1500);
