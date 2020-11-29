@@ -60,7 +60,7 @@
      bool NodeBLE::sendData(const void* data, uint16_t len){
 
 
-         bool good  =  dataCharacteristic.notify(data,len);
+         bool good  =  dataCharacteristic.indicate(data,len);
         if(!good){
 
             Serial.println("Problem sending data!");
