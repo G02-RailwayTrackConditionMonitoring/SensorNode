@@ -11,7 +11,8 @@
         Bluefruit.setName(deviceName.c_str());
 
         Bluefruit.configPrphBandwidth(BANDWIDTH_MAX); //This sets the MTU, Event length, and some Queue sizes.
-
+       Bluefruit.configPrphConn(247, 150, 3, BLE_GATTC_WRITE_CMD_TX_QUEUE_SIZE_DEFAULT);
+       Bluefruit.configCentralConn(247, 150, 3, BLE_GATTC_WRITE_CMD_TX_QUEUE_SIZE_DEFAULT);
         Bluefruit.setTxPower(txPower);
         Bluefruit.Periph.setConnInterval(minConnInterval,maxConnInterval);
         
@@ -24,9 +25,10 @@
         if(check != ERROR_NONE){
             Serial.printf("Error setting up BLE Service: %d\n",check);
         }
+
         dataCharacteristic = BLECharacteristic(dataCharacteristic_UUID);
         dataCharacteristic.setPermission(SECMODE_OPEN,SECMODE_NO_ACCESS);
-        dataCharacteristic.setFixedLen(61);
+        dataCharacteristic.setTempMemory();
         dataCharacteristic.setProperties(CHR_PROPS_INDICATE);
         check = dataCharacteristic.begin(); //This will be registered to the last service to call begin().
 
@@ -55,10 +57,21 @@
         Bluefruit.Advertising.start(totalTimeout);
     }
 
-     void NodeBLE::sendData(const void* data, uint16_t len){
+     bool NodeBLE::sendData(const void* data, uint16_t len){
 
+
+         bool good  =  dataCharacteristic.notify(data,len);
+        if(!good){
+
+            Serial.println("Problem sending data!");
+        }
+
+        return good;
+        //This freezes up. Could look into it later dont know if it is neccesssry.
+        //  int16_t connHandle = Bluefruit.connHandle();
+        //  BLEConnection* connection = Bluefruit.Connection(connHandle);
+        //  connection->waitForIndicateConfirm();
          
-         dataCharacteristic.indicate(data,len);
      }
 
      uint8_t NodeBLE::isConnected(){
@@ -124,4 +137,106 @@
 
         Serial.println();
         Serial.print("Disconnected, reason = 0x"); Serial.println(reason, HEX);
+    }
+
+    void NodeBLE::runBenchmark1(uint16_t packetSize,uint32_t numPackets){
+
+        //Print out all the parameters for conveinience.
+        uint16_t connHandle = Bluefruit.connHandle();
+        BLEConnection* connection = Bluefruit.Connection(connHandle);
+        uint16_t connInterval = connection->getConnectionInterval(); //1.25ms units
+        connection->requestMtuExchange(236);
+
+        Serial.println(" ");
+        Serial.println("Starting BLE Benchmark:");
+        Serial.printf("Packet Size: %d bytes\n",packetSize);
+        Serial.printf("Total Data Sent: %d bytes\n",packetSize*numPackets);
+        Serial.printf("PHY: %d Mbit\n",getPHY());
+        Serial.printf("MTU: %d bytes\n",getMTU());
+        Serial.printf("Initial RSSI: %d dB\n",getRSSI());
+        Serial.printf("Connection interval: %d ms\n",connInterval*1.25);
+        Serial.printf("Tx Power: %d\n",txPower);
+        Serial.println(" ");
+
+        
+        //Prep the packet.
+        uint8_t packet[packetSize*numPackets];
+        for(uint32_t i = 0; i<packetSize*numPackets;i++){
+
+            packet[i] = i%256;
+        }
+        uint32_t startTime = millis();
+
+        sendData(packet,packetSize);
+
+        uint32_t totalTime = (millis()-startTime);
+
+        Serial.printf("Total Time: %d ms\n" , totalTime);
+        Serial.printf("Total Thoughpout: %f bytes/second\n",(packetSize*numPackets)/(totalTime/1000.0));
+        Serial.println("====================================");
+    }
+
+    void NodeBLE::runBenchmark2(uint16_t packetSize,uint32_t numPackets){
+
+        //Print out all the parameters for conveinience.
+        uint16_t connHandle = Bluefruit.connHandle();
+        BLEConnection* connection = Bluefruit.Connection(connHandle);
+        uint16_t connInterval = connection->getConnectionInterval(); //1.25ms units
+
+        Serial.println(" ");
+        Serial.println("Starting BLE Benchmark:");
+        Serial.printf("Packet Size: %d bytes\n",packetSize);
+        Serial.printf("Total Data Sent: %d bytes\n",packetSize*numPackets);
+        Serial.printf("PHY: %d Mbit\n",getPHY());
+        Serial.printf("MTU: %d bytes\n",getMTU());
+        Serial.printf("Initial RSSI: %d dB\n",getRSSI());
+        Serial.printf("Connection interval: %d ms\n",connInterval*1.25);
+        Serial.printf("Tx Power: %d\n",txPower);
+        Serial.println(" ");
+
+        
+        //Prep the pack, just copy a random number to the packet array.
+        uint8_t packet[packetSize];
+         memset(packet,97,packetSize);
+
+        uint32_t startTime = millis();
+        uint32_t pcktStart;
+
+        uint32_t pcktTimes[numPackets];
+
+        for(uint32_t i=0; i<numPackets; i++){
+            
+            pcktStart = millis();
+            sendData(packet,packetSize);
+            pcktTimes[i] = pcktStart-millis();
+        }
+        uint32_t totalTime = (millis()-startTime);
+
+        // //Post Processing
+        double minPacketTime = pcktTimes[0]/1000.0;
+        double maxPacketTime = pcktTimes[0]/1000.0;
+        double avgPacketTime = pcktTimes[0]/1000.0;
+
+        for(uint32_t i=1; i<numPackets; i++){
+            
+            double curr = pcktTimes[i]/1000.0;
+            avgPacketTime += curr;
+
+            if(curr <minPacketTime){
+                minPacketTime = curr;
+            }
+
+            if(curr > maxPacketTime){
+                maxPacketTime = curr;
+            }
+
+         }
+
+
+        Serial.printf("Total Time: %d ms\n" , totalTime);
+        Serial.printf("Total Thoughpout: %f bytes/second\n",(packetSize*numPackets)/(totalTime/1000.0));
+        Serial.printf("Avg Packet Time: %f seconds (%f bytes/sec)\n",avgPacketTime,avgPacketTime/packetSize);
+        Serial.printf("Min Packet Time: %f seconds (%f bytes/sec)\n",minPacketTime,minPacketTime/packetSize);
+        Serial.printf("Max Packet Time: %f seconds (%f bytes/sec)\n",maxPacketTime,maxPacketTime/packetSize);
+        Serial.println("====================================");
     }

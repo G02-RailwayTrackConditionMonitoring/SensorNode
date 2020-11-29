@@ -13,12 +13,14 @@ class NodeBLE{
    
         void startBLE(String deviceName);
         void startAdvertising();
-        void sendData(const void* data, uint16_t len);
+        bool sendData(const void* data, uint16_t len);
         uint8_t  isConnected();
         int8_t getRSSI();
         uint8_t getPHY();
         uint16_t getMTU();
-        
+        void runBenchmark1(uint16_t packetSize,uint32_t numPackets);
+        void runBenchmark2(uint16_t packetSize,uint32_t numPackets);
+
     private:
 
         static void connectedCallback(uint16_t conn_handle);
