@@ -18,8 +18,12 @@ class NodeBLE{
         int8_t getRSSI();
         uint8_t getPHY();
         uint16_t getMTU();
+        uint16_t getConnInterval();
+
         void runBenchmark1(uint16_t packetSize,uint32_t numPackets);
         void runBenchmark2(uint16_t packetSize,uint32_t numPackets);
+        void runBenchmark3(uint32_t numBytes);
+        void runBenchmark4(uint32_t numBytes);
 
     private:
 
@@ -30,9 +34,14 @@ class NodeBLE{
 
         int8_t txPower{4}; // Can be the following values for NRF52840: -40, -20, -16, -12, -8, -4, 0, 2, 3, 4, 5, 6, 7, 8.
         
-        uint16_t minConnInterval{6};    //In 1.25 ms units. So for example, a value a 6 coresponds to 6*1.25ms = 7.5 ms.
+        uint16_t minConnInterval{3};    //In 1.25 ms units. So for example, a value a 6 coresponds to 6*1.25ms = 7.5 ms.
         uint16_t maxConnInterval{12};   //In 1.25 ms units.
         
+        static uint8_t mtu;
+
+        uint16_t eventLength{300};  //AKA the connection interval.
+        uint8_t  hvn_qsize{3}; 
+
         //How often we are sending advertising packets.
         //The BLE library allows for 2 different rates to be used. Fast advertising is done for fastAdvTimeout seconds and then the slow advertising rate is used for the remaining time until totalTimeout.
         uint16_t fastAdvInterval{32};   //In 0.625 ms units;
