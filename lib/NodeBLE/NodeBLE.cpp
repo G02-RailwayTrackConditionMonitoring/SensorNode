@@ -7,23 +7,26 @@
 
     void NodeBLE::startBLE(String deviceName){
         
-        Bluefruit.begin();  //This sets up the bluetooth software stack.
-
-        Bluefruit.setName(deviceName.c_str());
 
         //Bluefruit.configPrphBandwidth(BANDWIDTH_MAX); //This sets the MTU, Event length, and some Queue sizes automatically.
 
         //Not sure if these are configure the connection to the central or configure the connection as the central? So i've just included both for now.
         //TODO: Test which one is actually needed, I think we only need one of these.
-       Bluefruit.configPrphConn(mtu, eventLength, hvn_qsize, BLE_GATTC_WRITE_CMD_TX_QUEUE_SIZE_DEFAULT);
-       Bluefruit.configCentralConn(mtu, eventLength, hvn_qsize, BLE_GATTC_WRITE_CMD_TX_QUEUE_SIZE_DEFAULT); 
+        Bluefruit.configPrphConn(mtu, eventLength, hvn_qsize, BLE_GATTC_WRITE_CMD_TX_QUEUE_SIZE_DEFAULT);
+        Bluefruit.configCentralConn(mtu, eventLength, hvn_qsize, BLE_GATTC_WRITE_CMD_TX_QUEUE_SIZE_DEFAULT); 
+
+        Bluefruit.begin();  //This sets up the bluetooth software stack.
+
+        Bluefruit.setName(deviceName.c_str());
 
         Bluefruit.setTxPower(txPower);
         Bluefruit.Periph.setConnInterval(minConnInterval,maxConnInterval);
-        
+
         Bluefruit.Periph.setDisconnectCallback(NodeBLE::disconnectedCallback);
         Bluefruit.Periph.setConnectCallback(NodeBLE::connectedCallback) ;
-        
+
+
+
         //Setup the service and characteristics
         accelService = BLEService(accelService_UUID);
         err_t check = accelService.begin();   //This must be done before registering characteristics.
@@ -39,8 +42,11 @@
         check = dataCharacteristic.begin(); //This will be registered to the last service to call begin().
 
         if(check != ERROR_NONE){
-            Serial.printf("Error setting up BLE characteristic: %d\n",check);
+        Serial.printf("Error setting up BLE characteristic: %d\n",check);
         }
+
+
+
     }
 
     void NodeBLE::startAdvertising(){
