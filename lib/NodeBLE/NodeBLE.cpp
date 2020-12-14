@@ -243,7 +243,7 @@
 
         //Prep the pack, just copy a random number to the packet array.
         uint8_t packetSize = mtu;
-        uint32_t numPackets = 3;
+        uint32_t numPackets = numBytes/(packetSize-3);
         uint8_t packet[packetSize];
          memset(packet,97,packetSize);
 
@@ -284,7 +284,7 @@
 
         //Prep the pack, just copy a random number to the packet array.
         uint8_t packetSize = mtu;
-        uint32_t numPackets = 3;
+        uint32_t numPackets = numBytes/(packetSize-3);
         uint8_t packet[packetSize];
          memset(packet,97,packetSize);
 
