@@ -38,7 +38,7 @@
         dataCharacteristic.setPermission(SECMODE_OPEN,SECMODE_NO_ACCESS);
         dataCharacteristic.setTempMemory();
         dataCharacteristic.setProperties(CHR_PROPS_NOTIFY);
-        dataCharacteristic.setFixedLen(233);
+        
         check = dataCharacteristic.begin(); //This will be registered to the last service to call begin().
 
         if(check != ERROR_NONE){
@@ -139,8 +139,8 @@
 
         ble_gap_data_length_limitation_t limits;
          ble_gap_data_length_params_t dl_params;
-        dl_params.max_rx_octets = 236;
-        dl_params.max_tx_octets = 236;
+        dl_params.max_rx_octets = 250;
+        dl_params.max_tx_octets = 250;
         dl_params.max_rx_time_us = BLE_GAP_DATA_LENGTH_AUTO;
         dl_params.max_tx_time_us = BLE_GAP_DATA_LENGTH_AUTO;
 
@@ -155,14 +155,15 @@
         delay(1000);
         // request mtu exchange, apparently this can only be done once? The NRF_ERROR_INVALID_STATE error will happen if we do this again?
         Serial.println("Request to change MTU");
-        conn->requestMtuExchange(dl_params.max_rx_octets-limits.rx_payload_limited_octets);
-        mtu = dl_params.max_rx_octets-limits.rx_payload_limited_octets;
+        conn->requestMtuExchange(dl_params.max_rx_octets-limits.rx_payload_limited_octets-3);
+        mtu = dl_params.max_rx_octets-limits.rx_payload_limited_octets-3-3;
 
 
-        conn->monitorRssi();
+        conn->monitorRssi();   
 
         delay(1000);
     } 
+
     void NodeBLE::disconnectedCallback(uint16_t conn_handle, uint8_t reason){
 
         (void) conn_handle;
