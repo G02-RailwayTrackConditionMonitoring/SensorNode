@@ -34,12 +34,24 @@
             Serial.printf("Error setting up BLE Service: %d\n",check);
         }
 
-        dataCharacteristic = BLECharacteristic(dataCharacteristic_UUID);
-        dataCharacteristic.setPermission(SECMODE_OPEN,SECMODE_NO_ACCESS);
-        dataCharacteristic.setTempMemory();
-        dataCharacteristic.setProperties(CHR_PROPS_NOTIFY);
+        dataStream = BLECharacteristic(dataStream_UUID);
+        dataStream.setPermission(SECMODE_OPEN,SECMODE_NO_ACCESS);
+        dataStream.setTempMemory();
+        dataStream.setProperties(CHR_PROPS_NOTIFY);
+
+        commandStream = BLECharacteristic(commandStream_UUID);
+        commandStream.setPermission(SECMODE_OPEN,SECMODE_NO_ACCESS);
+        commandStream.setTempMemory();
+        commandStream.setProperties(CHR_PROPS_WRITE_WO_RESP);
+
+        telemetryStream = BLECharacteristic(telemetryStream_UUID);
+        telemetryStream.setPermission(SECMODE_OPEN,SECMODE_NO_ACCESS);
+        telemetryStream.setTempMemory();
+        telemetryStream.setProperties(CHR_PROPS_NOTIFY);
         
-        check = dataCharacteristic.begin(); //This will be registered to the last service to call begin().
+        check = dataStream.begin(); //This will be registered to the last service to call begin().
+        check = commandStream.begin();
+        check = telemetryStream.begin();
 
         if(check != ERROR_NONE){
         Serial.printf("Error setting up BLE characteristic: %d\n",check);
@@ -56,7 +68,9 @@
         
         //For now let's just put the name. Later we should decide how we are identify our sensor nodes. (name, service uuid, etc.)
         Bluefruit.Advertising.addName(); 
-        Bluefruit.Advertising.addUuid(dataCharacteristic_UUID);
+        Bluefruit.Advertising.addUuid(dataStream_UUID);
+        Bluefruit.Advertising.addUuid(commandStream_UUID);
+        Bluefruit.Advertising.addUuid(telemetryStream_UUID);
         
         //This should be set to false later, to save power? We need to think about what happens if we lose BLE connection.
         //I belevive we can also save connections, like pairing/bonding.
@@ -72,7 +86,7 @@
      bool NodeBLE::sendData(const void* data, uint16_t len){
 
 
-         bool good  =  dataCharacteristic.notify(data,len);
+         bool good  =  dataStream.notify(data,len);
         if(!good){
 
             Serial.println("Problem sending data!");
