@@ -1,7 +1,8 @@
 #include <Arduino.h>
 #include "NodeBLE.h"
 
-#define BUTTON_PIN  9
+//PIN_BUTTON1
+#define BUTTON_PIN  PIN_BUTTON1
 
 void setup(){
 
@@ -15,7 +16,7 @@ void setup(){
 
   Serial.println("Starting BLE...");
   
-  BLE_Stack.startBLE("G02_A");
+  BLE_Stack.startBLE("G02_B");
   
 
 }
@@ -37,12 +38,14 @@ void loop(){
 
         Bluefruit.printInfo();
 
-        BLE_Stack.runBenchmark4(8000);
+        BLE_Stack.runBenchmark4(18000);
+        BLE_Stack.sendTelemetry("telem test",sizeof("telem_test"));
 
         delay(5000);
+
       }
 
     }
-    delay(1500);
+    delay(500);
     // put your main code here, to run repeatedly:
   }

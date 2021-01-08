@@ -14,6 +14,7 @@ class NodeBLE{
         void startBLE(String deviceName);
         void startAdvertising();
         bool sendData(const void* data, uint16_t len);
+        bool sendTelemetry(const void* data, uint16_t len);
         uint8_t  isConnected();
         int8_t getRSSI();
         uint8_t getPHY();
@@ -29,6 +30,7 @@ class NodeBLE{
 
         static void connectedCallback(uint16_t conn_handle);
         static void disconnectedCallback(uint16_t conn_handle, uint8_t reason);
+        static void commandRxCallback(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t* data, uint16_t len);
 
         String  name{""};
 
