@@ -1,8 +1,17 @@
 #include <Arduino.h>
 #include "NodeBLE.h"
 
-//PIN_BUTTON1
+#ifdef NODE_1
+#define BUTTON_PIN  9
+#elif NODE_2
 #define BUTTON_PIN  PIN_BUTTON1
+#else
+#define BUTTON_PIN PIN_BUTTON1
+#endif
+
+
+
+
 
 void setup(){
 
@@ -16,8 +25,11 @@ void setup(){
 
   Serial.println("Starting BLE...");
   
+  #ifdef NODE_1
+  BLE_Stack.startBLE("G02_A");
+  #elif NODE_2
   BLE_Stack.startBLE("G02_B");
-  
+  #endif
 
 }
   //Loop
