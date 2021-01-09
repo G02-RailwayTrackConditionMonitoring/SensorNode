@@ -36,35 +36,41 @@ MPU9250::MPU9250(SPIClass &bus,uint8_t csPin){
   _useSPI = true; // set to use SPI
 }
 
-int MPU9250::test(){
-  _useSPIHS = false; // use low speed SPI for register write
-  writeRegister(PWR_MGMNT_2,0x07); // Disable the gyro, enable accelerometer
-  writeRegister(ACCEL_CONFIG2,0x08); // Bypass DLPF for accelerometer, 1.13K BW and 4K data rate
-  //_useSPIHS = true;
-}
-
-// Stripped down begin function for Capstone, no error checking
-int MPU9250::begin1(){
-
-  // Start SPI communication with the MPU-6500
-  _useSPIHS = false; // use low speed SPI for register write
+// Stripped down begin function for G02 Capstone, no error checking
+int MPU9250::init(){
+  // Begin SPI communication
+  _useSPIHS = false; // use low speed SPI for register setting
   pinMode(_csPin,OUTPUT); // setting CS pin to output
   digitalWrite(_csPin,HIGH); // setting CS pin high
   _spi->begin(); // begin SPI communication
 
-  // Select clock source to gyro
-  writeRegister(PWR_MGMNT_1,0x01); // Set to PLL gyro reference when ready
-  writeRegister(PWR_MGMNT_2,0x07); // Disable the gyro, enable accelerometer
-  writeRegister(CONFIG,0x00); // Rewrite FIFO when full, DLPF at max, will disable later
-  writeRegister(SMPDIV,0x00); // Set the sample rate divider to 0
-  writeRegister(ACCEL_CONFIG,0x18); // Set full scale to 16g
+  // Select clock source to PLL gyro reference once stable
+  writeRegister(PWR_MGMNT_1,CLOCK_SEL_PLL);
+
+  // Enable accelerometer and disable gyro
+  writeRegister(PWR_MGMNT_2,DIS_GYRO);
+
+  // Setting accel range to 16G full scale
+  writeRegister(ACCEL_CONFIG,ACCEL_FS_SEL_16G);
   _accelScale = G * 16.0f/32767.5f; // setting the accel scale to 16G
   _accelRange = ACCEL_RANGE_16G;
-  writeRegister(ACCEL_CONFIG2,0x08); // Bypass DLPF for accelerometer, 1.13K BW and 4K data rate
-  writeRegister(INT_PIN_CFG,0x22); // INT high INT_STATUS is read, disable FSYNC, I2C bypass mode (doesn't matter since using SPI)
-  writeRegister(INT_ENABLE,0x01); // Enable raw data ready interrupts
-  // writeRegister(USER_CTRL,0x40); // Enable FIFO
 
+  // Configure FIFO to rewrite FIFO once full, DLPF is set to max but will be disabled later
+  writeRegister(CONFIG,0x00);
+
+  // Bypass the DLPF for accelerometer
+  writeRegister(ACCEL_CONFIG2,ACCEL_DLPF_BYPASS); // 1.13K BW and 4K data rate
+  _bandwidth = DLPF_BANDWIDTH_BYPASS;
+
+  // Setting the sample rate divider to 0 as default, since DLPF is bypassed this isn't really necessary
+  writeRegister(SMPDIV,0x00); 
+  _srd = 0;
+
+  return 1; //init was successful
+
+  // writeRegister(INT_PIN_CFG,0x22); // INT high INT_STATUS is read, disable FSYNC, I2C bypass mode (doesn't matter since using SPI)
+  // writeRegister(INT_ENABLE,0x01); // Enable raw data ready interrupts
+  // // writeRegister(USER_CTRL,0x40); // Enable FIFO
 }
 
 /* starts communication with the MPU-9250 */
@@ -594,24 +600,26 @@ float MPU9250::getTemperature_C() {
 void MPU9250FIFO::haltSampleAccumulation(){
   // Added for benchmarking purposes, halts the accumulation of samples into FIFO
    _useSPIHS = false;
-  writeRegister(FIFO_EN,0x00);
+  writeRegister(FIFO_EN,0x00); //Disables FIFO
 }
 
 /* reads data from the MPU9250 FIFO and stores in buffer */
 int MPU9250FIFO::readFifo() {
 
-  //**THIS SHOULD IDEALLY BE OPERATING IN HS MODE**
-  _useSPIHS = false; // use the high speed SPI for data readout
+  //Donut
+  _useSPIHS = true; // This should ideally be operating at high speed SPI but causes data stability issues, use 1MHz
+  // _useSPIHS = true; // use the high speed SPI for data readout
+
   // get the fifo size
   readRegisters(FIFO_COUNT, 2, _buffer); // read in both high and low bytes of fifo_count
   _fifoSize = (((uint16_t) (_buffer[0]&0x0F)) << 8) + (((uint16_t) _buffer[1]));
 
-  // Added for troubleshooting
-  Serial.begin(115200);
-  Serial.print("FIFO Size is: ");
-  Serial.print(_fifoSize);
-  Serial.println(" Bytes");
-  Serial.end();
+  // // Display the length of the buffer in bytes, for troubleshooting purposes
+  // Serial.begin(115200);
+  // Serial.print("FIFO Size is: ");
+  // Serial.print(_fifoSize);
+  // Serial.println(" Bytes");
+  // Serial.end();
 
   // read and parse the buffer
   for (size_t i=0; i < _fifoSize/_fifoFrameSize; i++) {

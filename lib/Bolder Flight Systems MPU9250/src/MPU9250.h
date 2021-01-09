@@ -69,9 +69,8 @@ class MPU9250{
     };
     MPU9250(TwoWire &bus,uint8_t address);
     MPU9250(SPIClass &bus,uint8_t csPin);
-    int test();
     int begin();
-    int begin1();
+    int init(); // Modified begin to suit the needs of G02 Capstone project
     int setAccelRange(AccelRange range);
     int setGyroRange(GyroRange range);
     int setDlpfBandwidth(DlpfBandwidth bandwidth);
@@ -133,7 +132,8 @@ class MPU9250{
     bool _useSPIHS;
     const uint8_t SPI_READ = 0x80;
     const uint32_t SPI_LS_CLOCK = 1000000;  // 1 MHz
-    const uint32_t SPI_HS_CLOCK = 15000000; // 15 MHz
+    const uint32_t SPI_HS_CLOCK = 8000000; // 8 MHz, sould be able to operate at 20MHz but data stability issues >8MHz
+    // const uint32_t SPI_HS_CLOCK = 15000000; // 15 MHz
 
     // track success of interacting with sensor
     int _status;

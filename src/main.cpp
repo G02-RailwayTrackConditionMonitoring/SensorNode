@@ -27,9 +27,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
 MPU9250FIFO IMU(SPI,10);
 int status;
 
-// variables to hold FIFO data, these need to be large enough to hold the data
-//float ax[100], ay[100], az[100]; 
-float ax[1000], ay[1000], az[1000];
+// variables to hold FIFO data, these need to be large enough to hold the data, maximum expected is 85 samples
+float ax[100], ay[100], az[100];
 size_t fifoSize;
 
 void setup() {
@@ -37,24 +36,14 @@ void setup() {
   Serial.begin(115200);
   while(!Serial) {}
 
-  // start communication with IMU 
-  status = IMU.begin();
-  if (status < 0) {
-    Serial.println("IMU initialization unsuccessful");
-    Serial.println("Check IMU wiring or try cycling power");
-    Serial.print("Status: ");
-    Serial.println(status);
-    while(1) {}
-  }
-
-  // enabling the FIFO to record just the accelerometers
-  IMU.enableAccelFifo();
+  IMU.init(); // start communication with IMU   
+  IMU.enableAccelFifo(); // enabling the FIFO to record just the accelerometers
+  
   // Without delay 39 samples will be placed into FIFO when at 4kHz, FIFO can hold a max of 85 samples before overwriting
-  delay(10); 
-  // No addional samples will be placed into the FIFO
-  IMU.haltSampleAccumulation();
-  // read the fifo buffer from the IMU
-  IMU.readFifo();
+  delay(10); // delay of 10ms should result in an additional 40 samples
+  
+  IMU.haltSampleAccumulation(); // No addional samples will be placed into the FIFO
+  IMU.readFifo(); // read the fifo buffer from the IMU
 
   // get the X, Y, and Z accelerometer data and their size
   IMU.getFifoAccelX_mss(&fifoSize,ax);
