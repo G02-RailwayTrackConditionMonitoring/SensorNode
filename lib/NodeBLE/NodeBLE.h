@@ -39,7 +39,7 @@ class NodeBLE{
 
         String  name{""};
 
-        int8_t txPower{4}; // Can be the following values for NRF52840: -40, -20, -16, -12, -8, -4, 0, 2, 3, 4, 5, 6, 7, 8.
+        int8_t txPower{8}; // Can be the following values for NRF52840: -40, -20, -16, -12, -8, -4, 0, 2, 3, 4, 5, 6, 7, 8.
         
         uint16_t minConnInterval{3};    //In 1.25 ms units. So for example, a value a 6 coresponds to 6*1.25ms = 7.5 ms.
         uint16_t maxConnInterval{12};   //In 1.25 ms units.
