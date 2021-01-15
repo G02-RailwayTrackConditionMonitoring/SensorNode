@@ -672,6 +672,13 @@ int MPU9250FIFO::readFifo() {
   return 1;
 }
 
+/* returns the number of bytes in the fifo.*/
+int MPU9250FIFO::getFifoNumBytes(){
+
+  readRegisters(FIFO_COUNT, 2, _buffer); // read in both high and low bytes of fifo_count
+  _fifoSize = (((uint16_t) (_buffer[0]&0x0F)) << 8) + (((uint16_t) _buffer[1]));
+  return _fifoSize;
+}
 /* returns the accelerometer FIFO size and data in the x direction, m/s/s */
 void MPU9250FIFO::getFifoAccelX_mss(size_t *size,float* data) {
   *size = _aSize;
