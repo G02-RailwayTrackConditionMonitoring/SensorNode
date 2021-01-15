@@ -672,6 +672,97 @@ int MPU9250FIFO::readFifo() {
   return 1;
 }
 
+/* Reads in the FIFO data and stores it to "data". Stored x,y,z packed.
+  The downsampling factor will result in an effective sampling rate of 4kHz/downsampling_factor.*/
+int MPU9250FIFO::readFifoInt(int16_t* data,uint8_t* numSamples ,uint8_t downsampling_factor){
+
+  //Donut
+  _useSPIHS = true; // This should ideally be operating at high speed SPI but causes data stability issues, use 1MHz
+  // _useSPIHS = true; // use the high speed SPI for data readout
+
+  // get the fifo size
+  readRegisters(FIFO_COUNT, 2, _buffer); // read in both high and low bytes of fifo_count
+  _fifoSize = (((uint16_t) (_buffer[0]&0x0F)) << 8) + (((uint16_t) _buffer[1]));
+
+  *numSamples = _fifoSize/_fifoFrameSize / downsampling_factor;
+
+  // // Display the length of the buffer in bytes, for troubleshooting purposes
+  // Serial.begin(115200);
+  // Serial.print("FIFO Size is: ");
+  // Serial.print(_fifoSize);
+  // Serial.println(" Bytes");
+  // Serial.end();
+
+  // read and parse the buffer
+  for (size_t i=0; i < _fifoSize/_fifoFrameSize; i++) {
+
+
+    // grab the data from the MPU9250
+    if (readRegisters(FIFO_READ,_fifoFrameSize,_buffer) < 0) {
+      return -1;
+    }
+
+    //Skip samples so that we are downsampling the data. For ex. if downsampling_factor == 2, then we only save every 2nd sample.
+    //It's important that this is after we read registers, since we need to read to clear out fifo.
+    //Serial.printf("Reading sample %d from FIFO\n",i);
+    if(i % downsampling_factor == 0 ){ 
+
+      if (_enFifoAccel) {
+        // combine into 16 bit values
+        _axcounts = (((int16_t)_buffer[0]) << 8) | _buffer[1];  
+        _aycounts = (((int16_t)_buffer[2]) << 8) | _buffer[3];
+        _azcounts = (((int16_t)_buffer[4]) << 8) | _buffer[5];
+
+        //Serial.printf("X: %d, Y: %d, Z: %d \n",_axcounts,_aycounts,_azcounts);
+        //Convert to signed integers and copy to buffer. Signed int is a little nicer to work with compared to unsigned, but still compact.
+        int buff_index = ((i/downsampling_factor)*3); //For every sample, we copy three measurements, so we must skip ahead in the buffer by 3.
+
+        data[buff_index] = _axcounts ; //Subtract the mid point value to shift the measurement from [0,65535] to [-32767 , 32768].
+        data[buff_index+1] = _aycounts ;
+        data[buff_index+2] = _azcounts ;
+
+        _aSize = _fifoSize/_fifoFrameSize;
+      }
+      if (_enFifoTemp) {
+        // combine into 16 bit values
+        _tcounts = (((int16_t)_buffer[0 + _enFifoAccel*6]) << 8) | _buffer[1 + _enFifoAccel*6];
+        // transform and convert to float values
+        _tFifo[i] = ((((float) _tcounts) - _tempOffset)/_tempScale) + _tempOffset;
+        _tSize = _fifoSize/_fifoFrameSize;
+      }
+      if (_enFifoGyro) {
+        // combine into 16 bit values
+        _gxcounts = (((int16_t)_buffer[0 + _enFifoAccel*6 + _enFifoTemp*2]) << 8) | _buffer[1 + _enFifoAccel*6 + _enFifoTemp*2];
+        _gycounts = (((int16_t)_buffer[2 + _enFifoAccel*6 + _enFifoTemp*2]) << 8) | _buffer[3 + _enFifoAccel*6 + _enFifoTemp*2];
+        _gzcounts = (((int16_t)_buffer[4 + _enFifoAccel*6 + _enFifoTemp*2]) << 8) | _buffer[5 + _enFifoAccel*6 + _enFifoTemp*2];
+        // transform and convert to float values
+        _gxFifo[i] = ((float)(tX[0]*_gxcounts + tX[1]*_gycounts + tX[2]*_gzcounts) * _gyroScale) - _gxb;
+        _gyFifo[i] = ((float)(tY[0]*_gxcounts + tY[1]*_gycounts + tY[2]*_gzcounts) * _gyroScale) - _gyb;
+        _gzFifo[i] = ((float)(tZ[0]*_gxcounts + tZ[1]*_gycounts + tZ[2]*_gzcounts) * _gyroScale) - _gzb;
+        _gSize = _fifoSize/_fifoFrameSize;
+      }
+      if (_enFifoMag) {
+        // combine into 16 bit values
+        _hxcounts = (((int16_t)_buffer[1 + _enFifoAccel*6 + _enFifoTemp*2 + _enFifoGyro*6]) << 8) | _buffer[0 + _enFifoAccel*6 + _enFifoTemp*2 + _enFifoGyro*6];
+        _hycounts = (((int16_t)_buffer[3 + _enFifoAccel*6 + _enFifoTemp*2 + _enFifoGyro*6]) << 8) | _buffer[2 + _enFifoAccel*6 + _enFifoTemp*2 + _enFifoGyro*6];
+        _hzcounts = (((int16_t)_buffer[5 + _enFifoAccel*6 + _enFifoTemp*2 + _enFifoGyro*6]) << 8) | _buffer[4 + _enFifoAccel*6 + _enFifoTemp*2 + _enFifoGyro*6];
+        // transform and convert to float values
+        _hxFifo[i] = (((float)(_hxcounts) * _magScaleX) - _hxb)*_hxs;
+        _hyFifo[i] = (((float)(_hycounts) * _magScaleY) - _hyb)*_hys;
+        _hzFifo[i] = (((float)(_hzcounts) * _magScaleZ) - _hzb)*_hzs;
+        _hSize = _fifoSize/_fifoFrameSize;
+      }
+    }
+    else{
+            //Serial.println("skiping sample");
+    }
+    
+  }
+  
+  return 1;
+
+}
+
 /* returns the number of bytes in the fifo.*/
 int MPU9250FIFO::getFifoNumBytes(){
 
