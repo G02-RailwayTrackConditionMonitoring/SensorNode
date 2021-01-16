@@ -1,17 +1,22 @@
 #include "Arduino.h"
 #include "MPU9250.h"
 
+
 #define BUTTON_PIN PIN_BUTTON1
 // an MPU9250 object with the MPU-9250 sensor on SPI bus 0 and chip select pin 10
 MPU9250FIFO IMU(SPI,7);
 int status;
-int16_t accData[85*3];
+
 
 // variables to hold FIFO data, these need to be large enough to hold the data, maximum expected is 85 samples
 
 uint8_t fifoSize2;
 size_t fifoSize;
 float ax[100], ay[100], az[100];
+int16_t acc_x[85];
+int16_t acc_y[85];
+int16_t acc_z[85];
+uint8_t buffer_index=0;
 
 void setup() {
   // serial to display data
@@ -20,33 +25,38 @@ void setup() {
 
 
   IMU.init(); // start communication with IMU   
-  IMU.enableAccelFifo(); // enabling the FIFO to record just the accelerometers
-  
-  // Without delay 39 samples will be placed into FIFO when at 4kHz, FIFO can hold a max of 85 samples before overwriting
-  delay(10); // delay of 10ms should result in an additional 40 samples
-  
-  IMU.haltSampleAccumulation(); // No addional samples will be placed into the FIFO
-  
-  IMU.readFifoInt(accData,&fifoSize2,2); // read the fifo buffer from the IMU
 
-  // // get the X, Y, and Z accelerometer data and their size
-  // IMU.getFifoAccelX_mss(&fifoSize,ax);
-  // IMU.getFifoAccelY_mss(&fifoSize,ay);
-  // IMU.getFifoAccelZ_mss(&fifoSize,az);
-  
-  // print the data
-  Serial.print("The FIFO buffer is ");
-  Serial.print(fifoSize2);
-  Serial.println(" samples long.");
-  for (size_t i=0; i < fifoSize2; i++) {
-      Serial.printf("X: %5d, Y: %5d, Z: %5d \n",accData[(i*3)],accData[(i*3)+1],accData[(i*3)+2]);
-  }
+  IMU.enableAccelFifo(); // enabling the FIFO to record just the accelerometers
 }
 
 void loop() {
 
+  fifoSize = IMU.getFifoNumBytes()/6;
+  if(fifoSize<40){
+    delay(5); // Wait for another 40 samples.
+  }
+  else if(fifoSize>=40 && fifoSize<80){
+    delay((80-fifoSize)/8+1); // Delay proportional to number of samples needed.
+  }
+  else if(fifoSize>=80){
+    
+    // IMU.haltSampleAccumulation(); // No addional samples will be placed into the FIFO
+    
+    IMU.readFifoInt(acc_x,acc_y,acc_z,&fifoSize2,2); // read the fifo buffer from the IMU
 
-
+    // // get the X, Y, and Z accelerometer data and their size
+    // IMU.getFifoAccelX_mss(&fifoSize,ax);
+    // IMU.getFifoAccelY_mss(&fifoSize,ay);
+    // IMU.getFifoAccelZ_mss(&fifoSize,az);
+    
+    // print the data
+    // Serial.print("The FIFO buffer is ");
+    // Serial.print(fifoSize2);
+    // Serial.println(" samples long.");
+    // for (size_t i=0; i < fifoSize2; i++) {
+    //     Serial.printf("X: %5d, Y: %5d, Z: %5d \n",acc_x[i],acc_y[i],acc_z[i]);
+    // }
+  }
 }
 
 
