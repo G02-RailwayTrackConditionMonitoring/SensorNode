@@ -305,8 +305,9 @@ class MPU9250FIFO: public MPU9250 {
     using MPU9250::MPU9250;
     int enableAccelFifo();
     int enableFifo(bool accel,bool gyro,bool mag,bool temp);
+    //int readFifo(float* xdata,float* ydata, float* zdata, uint8_t* numSamples, uint8_t downsampling_factor);
     int readFifo();
-    int readFifoInt(int16_t* data,uint8_t* numSamples, uint8_t downsampling_factor);
+    int readFifoInt(int16_t* xdata,int16_t* ydata, int16_t* zdata, uint8_t* numSamples, uint8_t downsampling_factor);
     int getFifoNumBytes();
     void getFifoAccelX_mss(size_t *size,float* data);
     void getFifoAccelY_mss(size_t *size,float* data);

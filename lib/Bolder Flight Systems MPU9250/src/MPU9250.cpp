@@ -66,11 +66,12 @@ int MPU9250::init(){
   writeRegister(SMPDIV,0x00); 
   _srd = 0;
 
-  return 1; //init was successful
 
-  // writeRegister(INT_PIN_CFG,0x22); // INT high INT_STATUS is read, disable FSYNC, I2C bypass mode (doesn't matter since using SPI)
-  // writeRegister(INT_ENABLE,0x01); // Enable raw data ready interrupts
+
+  writeRegister(INT_PIN_CFG,0x10); // INT high INT_STATUS is read, disable FSYNC, I2C bypass mode (doesn't matter since using SPI)
+   writeRegister(INT_ENABLE,0x10); // Enable fifo overflow 
   // // writeRegister(USER_CTRL,0x40); // Enable FIFO
+    return 1; //init was successful
 }
 
 /* starts communication with the MPU-9250 */
@@ -674,7 +675,7 @@ int MPU9250FIFO::readFifo() {
 
 /* Reads in the FIFO data and stores it to "data". Stored x,y,z packed.
   The downsampling factor will result in an effective sampling rate of 4kHz/downsampling_factor.*/
-int MPU9250FIFO::readFifoInt(int16_t* data,uint8_t* numSamples ,uint8_t downsampling_factor){
+int MPU9250FIFO::readFifoInt(int16_t* xdata,int16_t* ydata, int16_t* zdata, uint8_t* numSamples, uint8_t downsampling_factor){
 
   //Donut
   _useSPIHS = true; // This should ideally be operating at high speed SPI but causes data stability issues, use 1MHz
@@ -715,11 +716,11 @@ int MPU9250FIFO::readFifoInt(int16_t* data,uint8_t* numSamples ,uint8_t downsamp
 
         //Serial.printf("X: %d, Y: %d, Z: %d \n",_axcounts,_aycounts,_azcounts);
         //Convert to signed integers and copy to buffer. Signed int is a little nicer to work with compared to unsigned, but still compact.
-        int buff_index = ((i/downsampling_factor)*3); //For every sample, we copy three measurements, so we must skip ahead in the buffer by 3.
+        int buff_index = ((i/downsampling_factor)); 
 
-        data[buff_index] = _axcounts ; //Subtract the mid point value to shift the measurement from [0,65535] to [-32767 , 32768].
-        data[buff_index+1] = _aycounts ;
-        data[buff_index+2] = _azcounts ;
+        xdata[buff_index] = _axcounts ;
+        ydata[buff_index] = _aycounts ;
+        zdata[buff_index] = _azcounts ;
 
         _aSize = _fifoSize/_fifoFrameSize;
       }
