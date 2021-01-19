@@ -1,12 +1,27 @@
 #include "Arduino.h"
 #include "MPU9250.h"
+#include "SdFat.h"
+#include "sdios.h"
+#include <nrf52840_peripherals.h>
 
+#define BUTTON_PIN 9//PIN_BUTTON1
 
-#define BUTTON_PIN PIN_BUTTON1
+//Pin numbers are MOSI: D13, MISO: D12, SCK:D11, CS: D10
+#define IMU_SPI_MOSI_PIN   13 
+#define IMU_SPI_MISO_PIN   12 
+#define IMU_SPI_SCK_PIN    11 
+#define IMU_SPI_CS_PIN     7
+//Setup a sepereate SPI bus for the IMU. 
+SPIClass IMU_SPI(NRF_SPIM2,IMU_SPI_MISO_PIN,IMU_SPI_SCK_PIN,IMU_SPI_MOSI_PIN);
+
 // an MPU9250 object with the MPU-9250 sensor on SPI bus 0 and chip select pin 10
-MPU9250FIFO IMU(SPI,7);
+MPU9250FIFO IMU(IMU_SPI,IMU_SPI_CS_PIN);
 int status;
 
+//Sd card object with FAT32 filesystem
+SdFat32 sd;
+File32 file;
+#define SPI_SPEED SD_SCK_MHZ(50)
 
 // variables to hold FIFO data, these need to be large enough to hold the data, maximum expected is 85 samples
 
@@ -16,17 +31,47 @@ float ax[100], ay[100], az[100];
 int16_t acc_x[85];
 int16_t acc_y[85];
 int16_t acc_z[85];
-uint8_t buffer_index=0;
+uint8_t buffer_index=0;//Keeps track of how many samples in the acc_x,acc_y,acc_z / sd buffer.
+int16_t sdBuffer[512];
 
 void setup() {
+  
+  
+  pinMode(BUTTON_PIN,INPUT_PULLUP);
   // serial to display data
   Serial.begin(115200);
   while(!Serial) {}
+  delay(5000);
+  //Setup SD card with cs pin 2, max Freq 10MHz.
+  if(!sd.begin(2,50)){
+    Serial.println("Error initializing SD card...");
+  }
+
+  // create /test on sd if it does not exist
+  if (!sd.exists("/test")) {
+    if (!sd.mkdir("/test")) {
+      Serial.println("SD card cannot find directory '/test', and cannot create it.");
+    }
+  }
+  // Make /test the working directory on sd.
+  if (!sd.chdir("test")) {
+     Serial.println("failed changing directory to '/test'");
+  }
+
+  Serial.println(F("------sd-------"));
+  sd.ls("/", LS_R | LS_SIZE);
+
+Serial.printf("Card size: %f\n",sd.card()->sectorCount()*512E-9);
 
 
+  if (!file.open("test.dat", O_WRONLY | O_CREAT | O_TRUNC)) {
+    Serial.println("open failed");
+  }
+  
   IMU.init(); // start communication with IMU   
-
   IMU.enableAccelFifo(); // enabling the FIFO to record just the accelerometers
+  Serial.println("Starting test");
+  Serial.flush();
 }
 
 void loop() {
@@ -34,181 +79,47 @@ void loop() {
   fifoSize = IMU.getFifoNumBytes()/6;
   if(fifoSize<40){
     delay(5); // Wait for another 40 samples.
+    
   }
   else if(fifoSize>=40 && fifoSize<80){
     delay((80-fifoSize)/8+1); // Delay proportional to number of samples needed.
+    
   }
   else if(fifoSize>=80){
     
     // IMU.haltSampleAccumulation(); // No addional samples will be placed into the FIFO
-    
-    IMU.readFifoInt(acc_x,acc_y,acc_z,&fifoSize2,2); // read the fifo buffer from the IMU
+    Serial.println("reading imu");
+    IMU.readFifoInt(&acc_x[buffer_index],&acc_y[buffer_index],&acc_z[buffer_index],&fifoSize2,2); // read the fifo buffer from the IMU
+    buffer_index += fifoSize2;
+    Serial.printf("buff idx: %d, fifoSize: %d\n",buffer_index,fifoSize);
+    Serial.flush();
 
-    // // get the X, Y, and Z accelerometer data and their size
-    // IMU.getFifoAccelX_mss(&fifoSize,ax);
-    // IMU.getFifoAccelY_mss(&fifoSize,ay);
-    // IMU.getFifoAccelZ_mss(&fifoSize,az);
-    
-    // print the data
-    // Serial.print("The FIFO buffer is ");
-    // Serial.print(fifoSize2);
-    // Serial.println(" samples long.");
-    // for (size_t i=0; i < fifoSize2; i++) {
-    //     Serial.printf("X: %5d, Y: %5d, Z: %5d \n",acc_x[i],acc_y[i],acc_z[i]);
-    // }
+    //Pack the data into x,y,z for writing to sd card.
+    for(int i=0; i< fifoSize; i++){
+      sdBuffer[i*3] = acc_x[i];
+      sdBuffer[(i*3)+1] = acc_y[i];
+      sdBuffer[(i*3)+2] = acc_z[i];
+    }
+
+
   }
+
+  if(buffer_index>80){
+    Serial.println("Writing to sd");
+    Serial.flush();
+    file.write(sdBuffer,buffer_index*6);
+    //file.sync(); // Sounds like this is needed?
+    buffer_index = 0;
+
+  }
+
+  if(digitalRead(BUTTON_PIN) == LOW ){
+
+    Serial.println("End of test...");
+    file.close();
+    Serial.flush();
+    while(1){};
+  }
+
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// //an MPU9250 object with the MPU-9250 sensor on SPI bus 0 and chip select pin 10
-// MPU9250 IMU(SPI,10);
-// int status;
-
-// void setup() {
-//   // serial to display data
-//   Serial.begin(115200);
-//   while(!Serial) {}
-
-//   // start communication with IMU 
-//   status = IMU.begin();
-//   if (status < 0) { 
-//     Serial.println("IMU initialization unsuccessful");
-//     Serial.println("Check IMU wiring or try cycling power");
-//     while(1) {
-//       Serial.print("Status: ");
-//       Serial.println(status);
-//     }
-//   }
-// }
-
-// void loop() {
-//   // read the sensor
-//   IMU.readSensor();
-//   // display the data
-//   Serial.print(IMU.getAccelX_mss(),6);
-//   Serial.print("\t");
-//   Serial.print(IMU.getAccelY_mss(),6);
-//   Serial.print("\t");
-//   Serial.print(IMU.getAccelZ_mss(),6);
-//   Serial.print("\t");
-//   Serial.print(IMU.getGyroX_rads(),6);
-//   Serial.print("\t");
-//   Serial.print(IMU.getGyroY_rads(),6);
-//   Serial.print("\t");
-//   Serial.print(IMU.getGyroZ_rads(),6);
-//   Serial.print("\t");
-//   Serial.print(IMU.getMagX_uT(),6);
-//   Serial.print("\t");
-//   Serial.print(IMU.getMagY_uT(),6);
-//   Serial.print("\t");
-//   Serial.print(IMU.getMagZ_uT(),6);
-//   Serial.print("\t");
-//   Serial.println(IMU.getTemperature_C(),6);
-//   delay(100);
-// }
-
-
-
-
-
-
-
-
-
-// #include "MPU9250.h"
-
-// // an MPU9250 object with the MPU-9250 sensor on I2C bus 0 with address 0x68
-// MPU9250 IMU(Wire,0x68);
-// int status;
-
-// void setup() {
-//   // serial to display data
-//   Serial.begin(115200);
-//   Serial.println("test");
-//   while(!Serial) {}
-
-//   // start communication with IMU 
-//   status = IMU.begin();
-//   if (status < 0) {
-//     Serial.println("IMU initialization unsuccessful");
-//     Serial.println("Check IMU wiring or try cycling power");
-//     Serial.print("Status: ");
-//     Serial.println(status);
-//     while(1) {}
-//   }
-//   Serial.println("init ran properly");
-// }
-
-// void loop() {
-//   Serial.println("this is running");
-//   // read the sensor
-//   IMU.readSensor();
-//   // display the data
-//   Serial.print(IMU.getAccelX_mss(),6);
-//   Serial.print("\t");
-//   Serial.print(IMU.getAccelY_mss(),6);
-//   Serial.print("\t");
-//   Serial.print(IMU.getAccelZ_mss(),6);
-//   Serial.print("\t");
-//   Serial.print(IMU.getGyroX_rads(),6);
-//   Serial.print("\t");
-//   Serial.print(IMU.getGyroY_rads(),6);
-//   Serial.print("\t");
-//   Serial.print(IMU.getGyroZ_rads(),6);
-//   Serial.print("\t");
-//   Serial.print(IMU.getMagX_uT(),6);
-//   Serial.print("\t");
-//   Serial.print(IMU.getMagY_uT(),6);
-//   Serial.print("\t");
-//   Serial.print(IMU.getMagZ_uT(),6);
-//   Serial.print("\t");
-//   Serial.println(IMU.getTemperature_C(),6);
-//   delay(100);
-// }
-
-// #include "MPU9250.h"
-
-// MPU9250 IMU(Wire,0x68);
-// int status;
-
-// void setup() {
-//   // serial to display data
-//   Serial.begin(115200);
-
-//   while(!Serial) {}
-//   Serial.println("infinite loop?");
-//   // start communication with IMU 
-//   status = IMU.begin();
-//   if (status < 0) {
-//     Serial.println("IMU initialization unsuccessful");
-//     Serial.println("Check IMU wiring or try cycling power");
-//     while(1) {
-//     Serial.print("Status: ");
-//     Serial.println(status);
-//     }
-//   }
-// }
-// void loop(){
-//   Serial.println("turn on");
-//   digitalWrite(LED_BUILTIN, HIGH);
-//   delay(1000);
-//   Serial.println("turn off");
-//   digitalWrite(LED_BUILTIN, LOW);
-//   delay(1000);
-// }
 
