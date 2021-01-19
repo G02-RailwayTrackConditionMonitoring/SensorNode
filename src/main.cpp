@@ -3,6 +3,7 @@
 #include "SdFat.h"
 #include "sdios.h"
 #include <nrf52840_peripherals.h>
+#include <arm_math.h>
 
 #define BUTTON_PIN 9//PIN_BUTTON1
 
