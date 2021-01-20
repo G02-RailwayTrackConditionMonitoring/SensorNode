@@ -21,7 +21,8 @@ int status;
 //Sd card object with FAT32 filesystem
 SdFat32 sd;
 File32 file;
-#define SPI_SPEED SD_SCK_MHZ(50)
+#define SPI_CLOCK SD_SCK_MHZ(50)
+#define SD_CS_PIN 2
 
 // variables to hold FIFO data, these need to be large enough to hold the data, maximum expected is 85 samples
 
@@ -43,7 +44,7 @@ void setup() {
   while(!Serial) {}
   delay(5000);
   //Setup SD card with cs pin 2, max Freq 10MHz.
-  if(!sd.begin(2,50)){
+  if(!sd.begin(SdSpiConfig(SD_CS_PIN, SHARED_SPI, SPI_CLOCK))){
     Serial.println("Error initializing SD card...");
   }
 
