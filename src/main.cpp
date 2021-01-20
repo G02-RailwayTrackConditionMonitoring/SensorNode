@@ -35,6 +35,17 @@ int16_t acc_z[85];
 uint8_t buffer_index=0;//Keeps track of how many samples in the acc_x,acc_y,acc_z / sd buffer.
 int16_t sdBuffer[512];
 
+//downsample filter stuff
+#define DOWNSAMPLE_FACTOR 2
+#define FILTER_TAPS       33
+float32_t filter_coefs[FILTER_TAPS];
+float32_t xfilter_state[FILTER_TAPS];
+float32_t yfilter_state[FILTER_TAPS];
+float32_t zfilter_state[FILTER_TAPS];
+arm_fir_decimate_instance_f32 filter_x = {DOWNSAMPLE_FACTOR,FILTER_TAPS,filter_coefs,xfilter_state};
+arm_fir_decimate_instance_f32 filter_y = {DOWNSAMPLE_FACTOR,FILTER_TAPS,filter_coefs,yfilter_state};
+arm_fir_decimate_instance_f32 filter_z = {DOWNSAMPLE_FACTOR,FILTER_TAPS,filter_coefs,zfilter_state};
+
 void setup() {
   
   
@@ -95,6 +106,7 @@ void loop() {
     Serial.printf("buff idx: %d, fifoSize: %d\n",buffer_index,fifoSize);
     Serial.flush();
 
+    arm_fir_decimate_f32()
     //Pack the data into x,y,z for writing to sd card.
     for(int i=0; i< fifoSize; i++){
       sdBuffer[i*3] = acc_x[i];
