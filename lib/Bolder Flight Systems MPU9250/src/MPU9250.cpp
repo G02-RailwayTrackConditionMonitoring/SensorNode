@@ -607,7 +607,7 @@ void MPU9250FIFO::haltSampleAccumulation(){
 }
 
 /* reads data from the MPU9250 FIFO and stores in buffer */
-int MPU9250FIFO::readFifo() {
+int MPU9250FIFO::readFifo(float* xdata,float* ydata, float* zdata, uint8_t* numSamples) {
 
   //Donut
   _useSPIHS = true; // This should ideally be operating at high speed SPI but causes data stability issues, use 1MHz
@@ -637,10 +637,10 @@ int MPU9250FIFO::readFifo() {
       _azcounts = (((int16_t)_buffer[4]) << 8) | _buffer[5];
 
       // transform and convert to float values
-      _axFifo[i] = (((float)(tX[0]*_axcounts + tX[1]*_aycounts + tX[2]*_azcounts) * _accelScale)-_axb)*_axs;
-      _ayFifo[i] = (((float)(tY[0]*_axcounts + tY[1]*_aycounts + tY[2]*_azcounts) * _accelScale)-_ayb)*_ays;
-      _azFifo[i] = (((float)(tZ[0]*_axcounts + tZ[1]*_aycounts + tZ[2]*_azcounts) * _accelScale)-_azb)*_azs;
-      _aSize = _fifoSize/_fifoFrameSize;
+      xdata[i] = (((float)(tX[0]*_axcounts + tX[1]*_aycounts + tX[2]*_azcounts) * _accelScale)-_axb)*_axs;
+      ydata[i] = (((float)(tY[0]*_axcounts + tY[1]*_aycounts + tY[2]*_azcounts) * _accelScale)-_ayb)*_ays;
+      zdata[i] = (((float)(tZ[0]*_axcounts + tZ[1]*_aycounts + tZ[2]*_azcounts) * _accelScale)-_azb)*_azs;
+      *numSamples = _fifoSize/_fifoFrameSize;
     }
     if (_enFifoTemp) {
       // combine into 16 bit values
@@ -975,7 +975,10 @@ int MPU9250::calibrateAccel() {
   }
   return 1;  
 }
-
+/* returns the acceleormeter scale factor*/
+float MPU9250::getAccelScaleFactor(){
+  return _accelScale;
+  }
 /* returns the accelerometer bias in the X direction, m/s/s */
 float MPU9250::getAccelBiasX_mss() {
   return _axb;
