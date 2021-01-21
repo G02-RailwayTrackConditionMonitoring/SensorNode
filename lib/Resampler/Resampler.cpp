@@ -16,7 +16,6 @@ Downsampler::Downsampler(int downsampling_factor,float32_t* filter_coefs,int num
 
 void Downsampler::downsample(float32_t* input, float32_t* output,int num_samples){
 
-    Serial.println("running downsample");
     arm_fir_decimate_f32(&filter,input,output,num_samples);
 }
 

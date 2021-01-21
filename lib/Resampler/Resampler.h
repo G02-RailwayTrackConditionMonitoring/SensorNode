@@ -7,7 +7,10 @@ class Downsampler{
 
 public:
 
+    //blocksize is the maximum chunk of samples you want to process.
     Downsampler(int downsampling_factor,float32_t* filter_coefs,int num_taps,int blocksize);
+
+    //num_samples must be multiple of downsampling factor, and less or equal to blocksize of downsampler.
     void downsample(float32_t* input, float32_t* output,int num_samples);
 
 private:
