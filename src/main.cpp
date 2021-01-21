@@ -30,12 +30,28 @@ File32 file;
 
 uint8_t fifoSize2;
 size_t fifoSize;
-float ax[100], ay[100], az[100];
-int16_t acc_x[85];
-int16_t acc_y[85];
-int16_t acc_z[85];
+
+float acc_x[85];
+float acc_y[85];
+float acc_z[85];
+
+float acc_x_2khz[85];
+float acc_y_2khz[85];
+float acc_z_2khz[85];
+
+int16_t acc_x_int[85];
+int16_t acc_y_int[85];
+int16_t acc_z_int[85];
+
 uint8_t buffer_index=0;//Keeps track of how many samples in the acc_x,acc_y,acc_z / sd buffer.
 int16_t sdBuffer[512];
+
+//We need a downsampler for each signal.
+Downsampler downsampler_x(2,anitaliasing_filter,FILTER_TAP_NUM,86);
+Downsampler downsampler_y(2,anitaliasing_filter,FILTER_TAP_NUM,86);
+Downsampler downsampler_z(2,anitaliasing_filter,FILTER_TAP_NUM,86);
+
+void  convert_to_int(float* in, int16_t* out, int num_samples, float bias, float scale, float axis_scale);
 
 void test_downsampling();
 
@@ -81,53 +97,72 @@ Serial.printf("Card size: %f\n",sd.card()->sectorCount()*512E-9);
 
 void loop() {
 
-  test_downsampling();
-  while(1){}
-  // fifoSize = IMU.getFifoNumBytes()/6;
-  // if(fifoSize<40){
-  //   delay(5); // Wait for another 40 samples.
+  fifoSize = IMU.getFifoNumBytes()/6;
+  if(fifoSize<40){
+    delay(5); // Wait for another 40 samples.
     
-  // }
-  // else if(fifoSize>=40 && fifoSize<80){
-  //   delay((80-fifoSize)/8+1); // Delay proportional to number of samples needed.
+  }
+  else if(fifoSize>=40 && fifoSize<80){
+    delay((80-fifoSize)/8+1); // Delay proportional to number of samples needed.
     
-  // }
-  // else if(fifoSize>=80){
+  }
+  else if(fifoSize>=80){
     
-  //   // IMU.haltSampleAccumulation(); // No addional samples will be placed into the FIFO
-  //   Serial.println("reading imu");
-  //   IMU.readFifoInt(&acc_x[buffer_index],&acc_y[buffer_index],&acc_z[buffer_index],&fifoSize2,2); // read the fifo buffer from the IMU
-  //   buffer_index += fifoSize2;
-  //   Serial.printf("buff idx: %d, fifoSize: %d\n",buffer_index,fifoSize);
-  //   Serial.flush();
+    // IMU.haltSampleAccumulation(); // No addional samples will be placed into the FIFO
+    Serial.println("reading imu");
+    IMU.readFifo(&acc_x[buffer_index],&acc_y[buffer_index],&acc_z[buffer_index],&fifoSize2); // read the fifo buffer from the IMU
 
     
-  //   //Pack the data into x,y,z for writing to sd card.
-  //   for(int i=0; i< fifoSize; i++){
-  //     sdBuffer[i*3] = acc_x[i];
-  //     sdBuffer[(i*3)+1] = acc_y[i];
-  //     sdBuffer[(i*3)+2] = acc_z[i];
-  //   }
+    downsampler_x.downsample(acc_x,acc_x_2khz,fifoSize2);
+    downsampler_y.downsample(acc_y,acc_y_2khz,fifoSize2);
+    downsampler_z.downsample(acc_z,acc_z_2khz,fifoSize2);
+
+    convert_to_int(acc_x_2khz,acc_x_int,fifoSize2/2,IMU.getAccelBiasX_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorX());
+    convert_to_int(acc_y_2khz,acc_y_int,fifoSize2/2,IMU.getAccelBiasY_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorY());
+    convert_to_int(acc_z_2khz,acc_z_int,fifoSize2/2,IMU.getAccelBiasZ_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorZ());
+
+    buffer_index += fifoSize2;
+    Serial.printf("buff idx: %d, fifoSize: %d\n",buffer_index,fifoSize2);
+    Serial.flush();
+
+    
+    //Pack the data into x,y,z for writing to sd card.
+    for(int i=0; i< fifoSize2; i++){
+      sdBuffer[i*3] = acc_x_int[i];
+      sdBuffer[(i*3)+1] = acc_y_int[i];
+      sdBuffer[(i*3)+2] = acc_z_int[i];
+    }
+
+  }
+
+  if(buffer_index>80){
+    Serial.println("Writing to sd");
+    Serial.flush();
+    file.write(sdBuffer,buffer_index*6);
+    //file.sync(); // Sounds like this is needed? NO!
+    buffer_index = 0;
+
+  }
+
+  if(digitalRead(BUTTON_PIN) == LOW ){
+
+    Serial.println("End of test...");
+    file.close();
+    Serial.flush();
+    while(1){};
+  }
+
+}
+
+void  convert_to_int(float* in, int16_t* out, int num_samples, float bias, float scale, float axis_scale){
 
 
-  // }
+    for(int i=0; i< num_samples;i++){
 
-  // if(buffer_index>80){
-  //   Serial.println("Writing to sd");
-  //   Serial.flush();
-  //   file.write(sdBuffer,buffer_index*6);
-  //   //file.sync(); // Sounds like this is needed?
-  //   buffer_index = 0;
-
-  // }
-
-  // if(digitalRead(BUTTON_PIN) == LOW ){
-
-  //   Serial.println("End of test...");
-  //   file.close();
-  //   Serial.flush();
-  //   while(1){};
-  // }
+      //this is basically the reverse of the conversion code in MPU9250 readFifo function.
+      out[i] = (int16_t)(((in[i]/axis_scale)+bias)/scale);
+   
+    }
 
 }
 
@@ -151,7 +186,7 @@ void test_downsampling(){
   int remainder = num_samples%samples_per_block;
   if(remainder) num_blocks = num_blocks+1;
 
-  Downsampler downsampler(2,anitaliasing_filter,FILTER_TAP_NUM,84);
+  Downsampler downsampler(2,anitaliasing_filter,FILTER_TAP_NUM,86);
 
   for(int i = 0; i < num_blocks; i++){
 
@@ -174,7 +209,6 @@ void test_downsampling(){
 
     Serial.printf("Time to downsample 1 block: %d\n", time);
     Serial.flush();
-    delay(500);
   }
   inputFile.close();
   file.close();
