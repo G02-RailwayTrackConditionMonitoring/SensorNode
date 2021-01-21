@@ -39,7 +39,7 @@ MPU9250::MPU9250(SPIClass &bus,uint8_t csPin){
 // Stripped down begin function for G02 Capstone, no error checking
 int MPU9250::init(){
   // Begin SPI communication
-  _useSPIHS = false; // use low speed SPI for register setting
+  _useSPIHS = true; // use low speed SPI for register setting
   pinMode(_csPin,OUTPUT); // setting CS pin to output
   digitalWrite(_csPin,HIGH); // setting CS pin high
   _spi->begin(); // begin SPI communication
@@ -507,13 +507,15 @@ int MPU9250FIFO::enableAccelFifo() {
 
   // use low speed SPI for register setting
   _useSPIHS = false;
-
+  int res;
   // Added these to improve sample rate
   // writeRegister(PWR_MGMNT_2,0x07); // Disable the gyro, enable accelerometer
   // writeRegister(ACCEL_CONFIG2,0x08); // Bypass DLPF for accelerometer, 1.13K BW and 4K data rate
-
-  writeRegister(USER_CTRL, (0x40 | I2C_MST_EN));
-  writeRegister(FIFO_EN,FIFO_ACCEL);
+  Serial.println("In IMU enable FIFO");
+  res = writeRegister(USER_CTRL, (0x40 | I2C_MST_EN));
+  Serial.printf("In IMU enable fifo, after userctrl: %d\n",res);
+  res = writeRegister(FIFO_EN,FIFO_ACCEL);
+  Serial.printf("In IMU enable FIFO after command sent:%d\n",res);
 }
 
 /* reads the most current data from MPU9250 and stores in buffer */
@@ -605,7 +607,7 @@ void MPU9250FIFO::haltSampleAccumulation(){
 }
 
 /* reads data from the MPU9250 FIFO and stores in buffer */
-int MPU9250FIFO::readFifo() {
+int MPU9250FIFO::readFifo(float* xdata,float* ydata, float* zdata, uint8_t* numSamples) {
 
   //Donut
   _useSPIHS = true; // This should ideally be operating at high speed SPI but causes data stability issues, use 1MHz
@@ -635,10 +637,10 @@ int MPU9250FIFO::readFifo() {
       _azcounts = (((int16_t)_buffer[4]) << 8) | _buffer[5];
 
       // transform and convert to float values
-      _axFifo[i] = (((float)(tX[0]*_axcounts + tX[1]*_aycounts + tX[2]*_azcounts) * _accelScale)-_axb)*_axs;
-      _ayFifo[i] = (((float)(tY[0]*_axcounts + tY[1]*_aycounts + tY[2]*_azcounts) * _accelScale)-_ayb)*_ays;
-      _azFifo[i] = (((float)(tZ[0]*_axcounts + tZ[1]*_aycounts + tZ[2]*_azcounts) * _accelScale)-_azb)*_azs;
-      _aSize = _fifoSize/_fifoFrameSize;
+      xdata[i] = (((float)(tX[0]*_axcounts + tX[1]*_aycounts + tX[2]*_azcounts) * _accelScale)-_axb)*_axs;
+      ydata[i] = (((float)(tY[0]*_axcounts + tY[1]*_aycounts + tY[2]*_azcounts) * _accelScale)-_ayb)*_ays;
+      zdata[i] = (((float)(tZ[0]*_axcounts + tZ[1]*_aycounts + tZ[2]*_azcounts) * _accelScale)-_azb)*_azs;
+      *numSamples = _fifoSize/_fifoFrameSize;
     }
     if (_enFifoTemp) {
       // combine into 16 bit values
@@ -973,7 +975,10 @@ int MPU9250::calibrateAccel() {
   }
   return 1;  
 }
-
+/* returns the acceleormeter scale factor*/
+float MPU9250::getAccelScaleFactor(){
+  return _accelScale;
+  }
 /* returns the accelerometer bias in the X direction, m/s/s */
 float MPU9250::getAccelBiasX_mss() {
   return _axb;
@@ -1184,11 +1189,13 @@ int MPU9250::writeRegister(uint8_t subAddress, uint8_t data){
     _i2c->write(data); // write the data
     _i2c->endTransmission();
   }
-
+  
   delay(10);
+  
   
   /* read back the register */
   readRegisters(subAddress,1,_buffer);
+   
   /* check the read back register against the written register */
   if(_buffer[0] == data) {
     return 1;
