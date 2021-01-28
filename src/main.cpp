@@ -35,29 +35,5 @@ void setup(){
   //Loop
 void loop(){
 
-    Serial.println("Itsy Bitsy Test");
-    digitalToggle(LED_BLUE);
-  
-    if(digitalRead(BUTTON_PIN) == LOW){
-
-      if(!BLE_Stack.isConnected()){
-        Serial.println("Starting Advertising");
-        BLE_Stack.startAdvertising();
-      }
-      else{
-
-        Serial.println("Starting Benchmark");
-
-        Bluefruit.printInfo();
-
-        BLE_Stack.runBenchmark4(18000);
-        BLE_Stack.sendTelemetry("telem test",sizeof("telem_test"));
-
-        delay(5000);
-
-      }
-
-    }
-    delay(500);
     // put your main code here, to run repeatedly:
   }
