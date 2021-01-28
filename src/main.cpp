@@ -1,13 +1,26 @@
 #include "Arduino.h"
+
+#include "NodeBLE.h"
+
 #include "MPU9250.h"
+
 #include "SdFat.h"
 #include "sdios.h"
 #include <nrf52840_peripherals.h>
+
 #include <arm_math.h>
 #include "Resampler.h"
 #include "filter.h"
 
-#define BUTTON_PIN 9//PIN_BUTTON1
+
+#ifdef NODE_1
+#define BUTTON_PIN  9
+#elif NODE_2
+#define BUTTON_PIN  PIN_BUTTON1
+#else
+#define BUTTON_PIN PIN_BUTTON1
+#endif
+
 
 //Pin numbers are MOSI: D13, MISO: D12, SCK:D11, CS: D10
 #define IMU_SPI_MOSI_PIN   13 
@@ -61,13 +74,20 @@ void  convert_to_int(float* in, int16_t* out, int num_samples, float bias, float
 void test_downsampling();
 
 void setup() {
-  
-  
-  pinMode(BUTTON_PIN,INPUT_PULLUP);
+
   // serial to display data
   Serial.begin(115200);
   while(!Serial) {}
   delay(5000);
+  
+  Serial.println("Starting BLE...");
+  
+  #ifdef NODE_1
+  BLE_Stack.startBLE("G02_A");
+  #elif NODE_2
+  BLE_Stack.startBLE("G02_B");
+  #endif
+  
   //Setup SD card with cs pin 2, max Freq 10MHz.
   if(!sd.begin(SdSpiConfig(SD_CS_PIN, SHARED_SPI, SPI_CLOCK))){
     Serial.println("Error initializing SD card...");
@@ -99,8 +119,8 @@ Serial.printf("Card size: %f\n",sd.card()->sectorCount()*512E-9);
   Serial.println("Starting test");
   Serial.flush();
 }
-
-void loop() {
+  //Loop
+void loop(){
 
   fifoSize = IMU.getFifoNumBytes()/6;
   if(fifoSize<40){
