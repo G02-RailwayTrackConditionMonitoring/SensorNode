@@ -86,17 +86,37 @@ void NodeBLE::startAdvertising(){
 
 bool NodeBLE::sendData(const void* data, uint16_t len){
 
-    bool good  =  dataStream.notify(data,len);
-    if(!good){
-
-        Serial.println("Problem sending data!");
+   //Serial.printf("Sending %d bytes\n",len);
+   digitalWrite(PIN_A0,HIGH);
+    uint16_t index = 0;
+    while(len>0){
+        uint8_t size = 0;
+        if(len >244){ 
+            size = 244;
+            
+        }
+        else {
+            size = len;
+        }
+        
+        void* buff = (void*)(((uint8_t*)data)[index]);
+        bool good = false;
+        while(!good){
+          good=  dataStream.notify(buff,size);
+        }   
+        index = index + size;
+        len = len-size;
     }
+    // if(!good){
+
+    //     Serial.println("Problem sending data!");
+    // }
 
     //  int16_t connHandle = Bluefruit.connHandle();
     //  BLEConnection* connection = Bluefruit.Connection(connHandle);
     //  connection->waitForIndicateConfirm();
-
-    return good;
+    digitalWrite(PIN_A0,LOW);
+    return true;
     //This freezes up. Could look into it later dont know if it is neccesssry.
 }
 

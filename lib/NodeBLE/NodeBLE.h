@@ -41,12 +41,12 @@ class NodeBLE{
 
         int8_t txPower{8}; // Can be the following values for NRF52840: -40, -20, -16, -12, -8, -4, 0, 2, 3, 4, 5, 6, 7, 8.
         
-        uint16_t minConnInterval{3};    //In 1.25 ms units. So for example, a value a 6 coresponds to 6*1.25ms = 7.5 ms.
-        uint16_t maxConnInterval{12};   //In 1.25 ms units.
+        uint16_t minConnInterval{1};    //In 1.25 ms units. So for example, a value a 6 coresponds to 6*1.25ms = 7.5 ms.
+        uint16_t maxConnInterval{2};   //In 1.25 ms units.
         
         static uint8_t mtu;
 
-        uint16_t eventLength{300};  //AKA the connection interval.
+        uint16_t eventLength{200};  //AKA the connection interval.
         uint8_t  hvn_qsize{3}; 
 
         //How often we are sending advertising packets.

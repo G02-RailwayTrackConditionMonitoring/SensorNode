@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "*.tcc": "cpp",
+        "cstdlib": "cpp",
+        "memory": "cpp",
+        "nrfx_prs.h": "c",
+        "nrfx_spim.h": "c"
+    }
+}
