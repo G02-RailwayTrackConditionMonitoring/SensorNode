@@ -16,6 +16,10 @@
         "unordered_map": "cpp",
         "vector": "cpp",
         "string_view": "cpp",
-        "initializer_list": "cpp"
+        "initializer_list": "cpp",
+        "nrfx_config.h": "c",
+        "nrf_spim.h": "c",
+        "exception": "cpp",
+        "new": "cpp"
     }
 }

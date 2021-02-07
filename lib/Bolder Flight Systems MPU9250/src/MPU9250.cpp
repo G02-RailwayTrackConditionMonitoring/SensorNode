@@ -45,32 +45,32 @@ int MPU9250::init(){
   _spi->begin(); // begin SPI communication
 
   // Select clock source to PLL gyro reference once stable
-  writeRegister(PWR_MGMNT_1,CLOCK_SEL_PLL);
+  writeRegisterBlocking(PWR_MGMNT_1,CLOCK_SEL_PLL);
 
   // Enable accelerometer and disable gyro
-  writeRegister(PWR_MGMNT_2,DIS_GYRO);
+  writeRegisterBlocking(PWR_MGMNT_2,DIS_GYRO);
 
   // Setting accel range to 16G full scale
-  writeRegister(ACCEL_CONFIG,ACCEL_FS_SEL_16G);
+  writeRegisterBlocking(ACCEL_CONFIG,ACCEL_FS_SEL_16G);
   _accelScale = G * 16.0f/32767.5f; // setting the accel scale to 16G
   _accelRange = ACCEL_RANGE_16G;
 
   // Configure FIFO to rewrite FIFO once full, DLPF is set to max but will be disabled later
-  writeRegister(CONFIG,0x00);
+  writeRegisterBlocking(CONFIG,0x00);
 
   // Bypass the DLPF for accelerometer
-  writeRegister(ACCEL_CONFIG2,ACCEL_DLPF_BYPASS); // 1.13K BW and 4K data rate
+  writeRegisterBlocking(ACCEL_CONFIG2,ACCEL_DLPF_BYPASS); // 1.13K BW and 4K data rate
   _bandwidth = DLPF_BANDWIDTH_BYPASS;
 
   // Setting the sample rate divider to 0 as default, since DLPF is bypassed this isn't really necessary
-  writeRegister(SMPDIV,0x00); 
+  writeRegisterBlocking(SMPDIV,0x00); 
   _srd = 0;
 
 
 
-  writeRegister(INT_PIN_CFG,0x10); // INT high INT_STATUS is read, disable FSYNC, I2C bypass mode (doesn't matter since using SPI)
-   writeRegister(INT_ENABLE,0x10); // Enable fifo overflow 
-  // // writeRegister(USER_CTRL,0x40); // Enable FIFO
+  writeRegisterBlocking(INT_PIN_CFG,0x10); // INT high INT_STATUS is read, disable FSYNC, I2C bypass mode (doesn't matter since using SPI)
+   writeRegisterBlocking(INT_ENABLE,0x10); // Enable fifo overflow 
+  // // writeRegisterBlocking(USER_CTRL,0x40); // Enable FIFO
     return 1; //init was successful
 }
 
@@ -92,7 +92,7 @@ int MPU9250::begin(){
     _i2c->setClock(_i2cRate);
   }
   // select clock source to gyro
-  if(writeRegister(PWR_MGMNT_1,CLOCK_SEL_PLL) < 0){
+  if(writeRegisterBlocking(PWR_MGMNT_1,CLOCK_SEL_PLL) < 0){
     return -1;
   }
   // // enable I2C master mode
@@ -120,11 +120,11 @@ int MPU9250::begin(){
   //  return -5;
   // }
   // enable accelerometer and disable gyro
-  if(writeRegister(PWR_MGMNT_2,DIS_GYRO) < 0){
+  if(writeRegisterBlocking(PWR_MGMNT_2,DIS_GYRO) < 0){
     return -6;
   }
   // setting accel range to 16G as default
-  if(writeRegister(ACCEL_CONFIG,ACCEL_FS_SEL_16G) < 0){
+  if(writeRegisterBlocking(ACCEL_CONFIG,ACCEL_FS_SEL_16G) < 0){
     return -7;
   }
   _accelScale = G * 16.0f/32767.5f; // setting the accel scale to 16G
@@ -139,7 +139,7 @@ int MPU9250::begin(){
   // _gyroRange = GYRO_RANGE_2000DPS;
   // setting bandwidth to 184Hz as default
 
-  if(writeRegister(ACCEL_CONFIG2,ACCEL_DLPF_BYPASS) < 0){ // changed* 
+  if(writeRegisterBlocking(ACCEL_CONFIG2,ACCEL_DLPF_BYPASS) < 0){ // changed* 
     return -9;
   } 
   // if(writeRegister(CONFIG,GYRO_DLPF_184) < 0){ // setting gyro bandwidth to 184Hz
@@ -147,7 +147,7 @@ int MPU9250::begin(){
   // }
   _bandwidth = DLPF_BANDWIDTH_BYPASS;
   // setting the sample rate divider to 0 as default, since DLPF is bypassed this shouldn't actually matter
-  if(writeRegister(SMPDIV,0x00) < 0){ 
+  if(writeRegisterBlocking(SMPDIV,0x00) < 0){ 
     return -11;
   } 
   _srd = 0;
@@ -212,7 +212,7 @@ int MPU9250::setAccelRange(AccelRange range) {
   switch(range) {
     case ACCEL_RANGE_2G: {
       // setting the accel range to 2G
-      if(writeRegister(ACCEL_CONFIG,ACCEL_FS_SEL_2G) < 0){
+      if(writeRegisterBlocking(ACCEL_CONFIG,ACCEL_FS_SEL_2G) < 0){
         return -1;
       }
       _accelScale = G * 2.0f/32767.5f; // setting the accel scale to 2G
@@ -228,7 +228,7 @@ int MPU9250::setAccelRange(AccelRange range) {
     }
     case ACCEL_RANGE_8G: {
       // setting the accel range to 8G
-      if(writeRegister(ACCEL_CONFIG,ACCEL_FS_SEL_8G) < 0){
+      if(writeRegisterBlocking(ACCEL_CONFIG,ACCEL_FS_SEL_8G) < 0){
         return -1;
       }
       _accelScale = G * 8.0f/32767.5f; // setting the accel scale to 8G
@@ -254,7 +254,7 @@ int MPU9250::setGyroRange(GyroRange range) {
   switch(range) {
     case GYRO_RANGE_250DPS: {
       // setting the gyro range to 250DPS
-      if(writeRegister(GYRO_CONFIG,GYRO_FS_SEL_250DPS) < 0){
+      if(writeRegisterBlocking(GYRO_CONFIG,GYRO_FS_SEL_250DPS) < 0){
         return -1;
       }
       _gyroScale = 250.0f/32767.5f * _d2r; // setting the gyro scale to 250DPS
@@ -270,7 +270,7 @@ int MPU9250::setGyroRange(GyroRange range) {
     }
     case GYRO_RANGE_1000DPS: {
       // setting the gyro range to 1000DPS
-      if(writeRegister(GYRO_CONFIG,GYRO_FS_SEL_1000DPS) < 0){
+      if(writeRegisterBlocking(GYRO_CONFIG,GYRO_FS_SEL_1000DPS) < 0){
         return -1;
       }
       _gyroScale = 1000.0f/32767.5f * _d2r; // setting the gyro scale to 1000DPS
@@ -278,7 +278,7 @@ int MPU9250::setGyroRange(GyroRange range) {
     }
     case GYRO_RANGE_2000DPS: {
       // setting the gyro range to 2000DPS
-      if(writeRegister(GYRO_CONFIG,GYRO_FS_SEL_2000DPS) < 0){
+      if(writeRegisterBlocking(GYRO_CONFIG,GYRO_FS_SEL_2000DPS) < 0){
         return -1;
       }
       _gyroScale = 2000.0f/32767.5f * _d2r; // setting the gyro scale to 2000DPS
@@ -305,55 +305,55 @@ int MPU9250::setDlpfBandwidth(DlpfBandwidth bandwidth) {
     //   break;
     // }
     case DLPF_BANDWIDTH_184HZ: {
-      if(writeRegister(ACCEL_CONFIG2,ACCEL_DLPF_184) < 0){ // setting accel bandwidth to 184Hz
+      if(writeRegisterBlocking(ACCEL_CONFIG2,ACCEL_DLPF_184) < 0){ // setting accel bandwidth to 184Hz
         return -1;
       } 
-      if(writeRegister(CONFIG,GYRO_DLPF_184) < 0){ // setting gyro bandwidth to 184Hz
+      if(writeRegisterBlocking(CONFIG,GYRO_DLPF_184) < 0){ // setting gyro bandwidth to 184Hz
         return -2;
       }
       break;
     }
     case DLPF_BANDWIDTH_92HZ: {
-      if(writeRegister(ACCEL_CONFIG2,ACCEL_DLPF_92) < 0){ // setting accel bandwidth to 92Hz
+      if(writeRegisterBlocking(ACCEL_CONFIG2,ACCEL_DLPF_92) < 0){ // setting accel bandwidth to 92Hz
         return -1;
       } 
-      if(writeRegister(CONFIG,GYRO_DLPF_92) < 0){ // setting gyro bandwidth to 92Hz
+      if(writeRegisterBlocking(CONFIG,GYRO_DLPF_92) < 0){ // setting gyro bandwidth to 92Hz
         return -2;
       }
       break;
     }
     case DLPF_BANDWIDTH_41HZ: {
-      if(writeRegister(ACCEL_CONFIG2,ACCEL_DLPF_41) < 0){ // setting accel bandwidth to 41Hz
+      if(writeRegisterBlocking(ACCEL_CONFIG2,ACCEL_DLPF_41) < 0){ // setting accel bandwidth to 41Hz
         return -1;
       } 
-      if(writeRegister(CONFIG,GYRO_DLPF_41) < 0){ // setting gyro bandwidth to 41Hz
+      if(writeRegisterBlocking(CONFIG,GYRO_DLPF_41) < 0){ // setting gyro bandwidth to 41Hz
         return -2;
       }
       break;
     }
     case DLPF_BANDWIDTH_20HZ: {
-      if(writeRegister(ACCEL_CONFIG2,ACCEL_DLPF_20) < 0){ // setting accel bandwidth to 20Hz
+      if(writeRegisterBlocking(ACCEL_CONFIG2,ACCEL_DLPF_20) < 0){ // setting accel bandwidth to 20Hz
         return -1;
       } 
-      if(writeRegister(CONFIG,GYRO_DLPF_20) < 0){ // setting gyro bandwidth to 20Hz
+      if(writeRegisterBlocking(CONFIG,GYRO_DLPF_20) < 0){ // setting gyro bandwidth to 20Hz
         return -2;
       }
       break;
     }
     case DLPF_BANDWIDTH_10HZ: {
-      if(writeRegister(ACCEL_CONFIG2,ACCEL_DLPF_10) < 0){ // setting accel bandwidth to 10Hz
+      if(writeRegisterBlocking(ACCEL_CONFIG2,ACCEL_DLPF_10) < 0){ // setting accel bandwidth to 10Hz
         return -1;
       } 
-      if(writeRegister(CONFIG,GYRO_DLPF_10) < 0){ // setting gyro bandwidth to 10Hz
+      if(writeRegisterBlocking(CONFIG,GYRO_DLPF_10) < 0){ // setting gyro bandwidth to 10Hz
         return -2;
       }
       break;
     }
     case DLPF_BANDWIDTH_5HZ: {
-      if(writeRegister(ACCEL_CONFIG2,ACCEL_DLPF_5) < 0){ // setting accel bandwidth to 5Hz
+      if(writeRegisterBlocking(ACCEL_CONFIG2,ACCEL_DLPF_5) < 0){ // setting accel bandwidth to 5Hz
         return -1;
       } 
-      if(writeRegister(CONFIG,GYRO_DLPF_5) < 0){ // setting gyro bandwidth to 5Hz
+      if(writeRegisterBlocking(CONFIG,GYRO_DLPF_5) < 0){ // setting gyro bandwidth to 5Hz
         return -2;
       }
       break;
@@ -368,7 +368,7 @@ int MPU9250::setSrd(uint8_t srd) {
   // use low speed SPI for register setting
   _useSPIHS = false;
   /* setting the sample rate divider to 19 to facilitate setting up magnetometer */
-  if(writeRegister(SMPDIV,19) < 0){ // setting the sample rate divider
+  if(writeRegisterBlocking(SMPDIV,19) < 0){ // setting the sample rate divider
     return -1;
   }
   if(srd > 9){
@@ -399,7 +399,7 @@ int MPU9250::setSrd(uint8_t srd) {
     readAK8963Registers(AK8963_HXL,7,_buffer);    
   } 
   /* setting the sample rate divider */
-  if(writeRegister(SMPDIV,srd) < 0){ // setting the sample rate divider
+  if(writeRegisterBlocking(SMPDIV,srd) < 0){ // setting the sample rate divider
     return -4;
   } 
   _srd = srd;
@@ -411,10 +411,10 @@ int MPU9250::enableDataReadyInterrupt() {
   // use low speed SPI for register setting
   _useSPIHS = false;
   /* setting the interrupt */
-  if (writeRegister(INT_PIN_CFG,INT_PULSE_50US) < 0){ // setup interrupt, 50 us pulse
+  if (writeRegisterBlocking(INT_PIN_CFG,INT_PULSE_50US) < 0){ // setup interrupt, 50 us pulse
     return -1;
   }  
-  if (writeRegister(INT_ENABLE,INT_RAW_RDY_EN) < 0){ // set to data ready
+  if (writeRegisterBlocking(INT_ENABLE,INT_RAW_RDY_EN) < 0){ // set to data ready
     return -2;
   }
   return 1;
@@ -424,7 +424,7 @@ int MPU9250::enableDataReadyInterrupt() {
 int MPU9250::disableDataReadyInterrupt() {
   // use low speed SPI for register setting
   _useSPIHS = false;
-  if(writeRegister(INT_ENABLE,INT_DISABLE) < 0){ // disable interrupt
+  if(writeRegisterBlocking(INT_ENABLE,INT_DISABLE) < 0){ // disable interrupt
     return -1;
   }  
   return 1;
@@ -437,32 +437,32 @@ int MPU9250::enableWakeOnMotion(float womThresh_mg,LpAccelOdr odr) {
   // set AK8963 to Power Down
   writeAK8963Register(AK8963_CNTL1,AK8963_PWR_DOWN);
   // reset the MPU9250
-  writeRegister(PWR_MGMNT_1,PWR_RESET);
+  writeRegisterBlocking(PWR_MGMNT_1,PWR_RESET);
   // wait for MPU-9250 to come back up
   delay(1);
-  if(writeRegister(PWR_MGMNT_1,0x00) < 0){ // cycle 0, sleep 0, standby 0
+  if(writeRegisterBlocking(PWR_MGMNT_1,0x00) < 0){ // cycle 0, sleep 0, standby 0
     return -1;
   } 
-  if(writeRegister(PWR_MGMNT_2,DIS_GYRO) < 0){ // disable gyro measurements
+  if(writeRegisterBlocking(PWR_MGMNT_2,DIS_GYRO) < 0){ // disable gyro measurements
     return -2;
   } 
-  if(writeRegister(ACCEL_CONFIG2,ACCEL_DLPF_184) < 0){ // setting accel bandwidth to 184Hz
+  if(writeRegisterBlocking(ACCEL_CONFIG2,ACCEL_DLPF_184) < 0){ // setting accel bandwidth to 184Hz
     return -3;
   } 
-  if(writeRegister(INT_ENABLE,INT_WOM_EN) < 0){ // enabling interrupt to wake on motion
+  if(writeRegisterBlocking(INT_ENABLE,INT_WOM_EN) < 0){ // enabling interrupt to wake on motion
     return -4;
   } 
-  if(writeRegister(MOT_DETECT_CTRL,(ACCEL_INTEL_EN | ACCEL_INTEL_MODE)) < 0){ // enabling accel hardware intelligence
+  if(writeRegisterBlocking(MOT_DETECT_CTRL,(ACCEL_INTEL_EN | ACCEL_INTEL_MODE)) < 0){ // enabling accel hardware intelligence
     return -5;
   } 
   _womThreshold = map(womThresh_mg, 0, 1020, 0, 255);
-  if(writeRegister(WOM_THR,_womThreshold) < 0){ // setting wake on motion threshold
+  if(writeRegisterBlocking(WOM_THR,_womThreshold) < 0){ // setting wake on motion threshold
     return -6;
   }
-  if(writeRegister(LP_ACCEL_ODR,(uint8_t)odr) < 0){ // set frequency of wakeup
+  if(writeRegisterBlocking(LP_ACCEL_ODR,(uint8_t)odr) < 0){ // set frequency of wakeup
     return -7;
   }
-  if(writeRegister(PWR_MGMNT_1,PWR_CYCLE) < 0){ // switch to accel low power mode
+  if(writeRegisterBlocking(PWR_MGMNT_1,PWR_CYCLE) < 0){ // switch to accel low power mode
     return -8;
   }
   return 1;
@@ -483,10 +483,10 @@ int MPU9250FIFO::enableFifo(bool accel,bool gyro,bool mag,bool temp) {
   // writeRegister(PWR_MGMNT_2,0x07); // Disable the gyro, enable accelerometer
   // writeRegister(ACCEL_CONFIG2,0x08); // Bypass DLPF for accelerometer, 1.13K BW and 4K data rate
 
-  if(writeRegister(USER_CTRL, (0x40 | I2C_MST_EN)) < 0){
+  if(writeRegisterBlocking(USER_CTRL, (0x40 | I2C_MST_EN)) < 0){
     return -1;
   }
-  if(writeRegister(FIFO_EN,(accel*FIFO_ACCEL)|(gyro*FIFO_GYRO)|(temp*FIFO_TEMP)) < 0){ //|(mag*FIFO_MAG){
+  if(writeRegisterBlocking(FIFO_EN,(accel*FIFO_ACCEL)|(gyro*FIFO_GYRO)|(temp*FIFO_TEMP)) < 0){ //|(mag*FIFO_MAG){
     return -2;
   }
   _enFifoAccel = accel;
@@ -512,9 +512,9 @@ int MPU9250FIFO::enableAccelFifo() {
   // writeRegister(PWR_MGMNT_2,0x07); // Disable the gyro, enable accelerometer
   // writeRegister(ACCEL_CONFIG2,0x08); // Bypass DLPF for accelerometer, 1.13K BW and 4K data rate
   Serial.println("In IMU enable FIFO");
-  res = writeRegister(USER_CTRL, (0x40 | I2C_MST_EN));
+  res = writeRegisterBlocking(USER_CTRL, (0x40 | I2C_MST_EN));
   Serial.printf("In IMU enable fifo, after userctrl: %d\n",res);
-  res = writeRegister(FIFO_EN,FIFO_ACCEL);
+  res = writeRegisterBlocking(FIFO_EN,FIFO_ACCEL);
   Serial.printf("In IMU enable FIFO after command sent:%d\n",res);
 }
 
@@ -522,7 +522,7 @@ int MPU9250FIFO::enableAccelFifo() {
 int MPU9250::readSensor() {
   _useSPIHS = true; // use the high speed SPI for data readout
   // grab the data from the MPU9250
-  if (readRegisters(ACCEL_OUT, 21, _buffer) < 0) {
+  if (readRegistersBlocking(ACCEL_OUT, 21, _buffer) < 0) {
     return -1;
   }
   // combine into 16 bit values
@@ -603,7 +603,7 @@ float MPU9250::getTemperature_C() {
 void MPU9250FIFO::haltSampleAccumulation(){
   // Added for benchmarking purposes, halts the accumulation of samples into FIFO
    _useSPIHS = false;
-  writeRegister(FIFO_EN,0x00); //Disables FIFO
+  writeRegisterBlocking(FIFO_EN,0x00); //Disables FIFO
 }
 
 /* reads data from the MPU9250 FIFO and stores in buffer */
@@ -614,7 +614,7 @@ int MPU9250FIFO::readFifo(float* xdata,float* ydata, float* zdata, uint8_t* numS
   // _useSPIHS = true; // use the high speed SPI for data readout
 
   // get the fifo size
-  readRegisters(FIFO_COUNT, 2, _buffer); // read in both high and low bytes of fifo_count
+  readRegistersBlocking(FIFO_COUNT, 2, _buffer); // read in both high and low bytes of fifo_count
   _fifoSize = (((uint16_t) (_buffer[0]&0x0F)) << 8) + (((uint16_t) _buffer[1]));
   
   // // Display the length of the buffer in bytes, for troubleshooting purposes
@@ -636,11 +636,12 @@ int MPU9250FIFO::readFifo(float* xdata,float* ydata, float* zdata, uint8_t* numS
   //   // _spi->transfer(testbufftx,&testbuff[256],255);
   //   digitalWrite(_csPin,HIGH); // deselect the MPU9250 chip
     // _spi->endTransaction(); // end the transaction
-
+  Serial.println("In read fifo");
+  Serial.flush();
   // read and parse the buffer
   for (size_t i=0; i < _fifoSize/_fifoFrameSize; i++) {
     // grab the data from the MPU9250
-    if (readRegisters(FIFO_READ,_fifoFrameSize,_buffer) < 0) {
+    if (readRegistersBlocking(FIFO_READ,_fifoFrameSize,_buffer) < 0) {
       return -1;
     }
     if (_enFifoAccel) {
@@ -697,7 +698,7 @@ int MPU9250FIFO::readFifoInt(int16_t* xdata,int16_t* ydata, int16_t* zdata, uint
   // _useSPIHS = true; // use the high speed SPI for data readout
 
   // get the fifo size
-  readRegisters(FIFO_COUNT, 2, _buffer); // read in both high and low bytes of fifo_count
+  readRegistersBlocking(FIFO_COUNT, 2, _buffer); // read in both high and low bytes of fifo_count
   _fifoSize = (((uint16_t) (_buffer[0]&0x0F)) << 8) + (((uint16_t) _buffer[1]));
 
   *numSamples = _fifoSize/_fifoFrameSize / downsampling_factor;
@@ -714,7 +715,7 @@ int MPU9250FIFO::readFifoInt(int16_t* xdata,int16_t* ydata, int16_t* zdata, uint
 
 
     // grab the data from the MPU9250
-    if (readRegisters(FIFO_READ,_fifoFrameSize,_buffer) < 0) {
+    if (readRegistersBlocking(FIFO_READ,_fifoFrameSize,_buffer) < 0) {
       return -1;
     }
 
@@ -782,7 +783,7 @@ int MPU9250FIFO::readFifoInt(int16_t* xdata,int16_t* ydata, int16_t* zdata, uint
 /* returns the number of bytes in the fifo.*/
 int MPU9250FIFO::getFifoNumBytes(){
 
-  readRegisters(FIFO_COUNT, 2, _buffer); // read in both high and low bytes of fifo_count
+  readRegistersBlocking(FIFO_COUNT, 2, _buffer); // read in both high and low bytes of fifo_count
   _fifoSize = (((uint16_t) (_buffer[0]&0x0F)) << 8) + (((uint16_t) _buffer[1]));
   return _fifoSize;
 }
@@ -1188,26 +1189,83 @@ void MPU9250::setMagCalZ(float bias,float scaleFactor) {
 /* writes a byte to MPU9250 register given a register address and data */
 int MPU9250::writeRegister(uint8_t subAddress, uint8_t data){
   /* write data to device */
-  if( _useSPI ){
-    _spi->beginTransaction(SPISettings(SPI_LS_CLOCK, MSBFIRST, SPI_MODE3)); // begin the transaction
-    digitalWrite(_csPin,LOW); // select the MPU9250 chip
-    _spi->transfer(subAddress); // write the register address
-    _spi->transfer(data); // write the data
-    digitalWrite(_csPin,HIGH); // deselect the MPU9250 chip
-    _spi->endTransaction(); // end the transaction
-  }
-  else{
-    _i2c->beginTransmission(_address); // open the device
-    _i2c->write(subAddress); // write the register address
-    _i2c->write(data); // write the data
-    _i2c->endTransmission();
-  }
+  // if( _useSPI ){
+  //   _spi->beginTransaction(SPISettings(SPI_LS_CLOCK, MSBFIRST, SPI_MODE3)); // begin the transaction
+  //   digitalWrite(_csPin,LOW); // select the MPU9250 chip
+  //   _spi->transfer(subAddress); // write the register address
+  //   _spi->transfer(data); // write the data
+  //   digitalWrite(_csPin,HIGH); // deselect the MPU9250 chip
+  //   _spi->endTransaction(); // end the transaction
+  // }
+  // else{
+  //   _i2c->beginTransmission(_address); // open the device
+  //   _i2c->write(subAddress); // write the register address
+  //   _i2c->write(data); // write the data
+  //   _i2c->endTransmission();
+  // }
   
-  delay(10);
+  // delay(10);
   
   
-  /* read back the register */
-  readRegisters(subAddress,1,_buffer);
+  // /* read back the register */
+  // readRegisters(subAddress,1,_buffer);
+   
+  // /* check the read back register against the written register */
+  // if(_buffer[0] == data) {
+  //   return 1;
+  // }
+  // else{
+  //   return -1;
+  // }
+}
+
+/* reads registers from MPU9250 given a starting register address, number of bytes, and a pointer to store data */
+int MPU9250::readRegisters(uint8_t subAddress, uint8_t count, uint8_t* dest){
+  // if( _useSPI ){
+  //   // begin the transaction
+  //   if(_useSPIHS){
+  //     _spi->beginTransaction(SPISettings(SPI_HS_CLOCK, MSBFIRST, SPI_MODE3));
+  //   }
+  //   else{
+  //     _spi->beginTransaction(SPISettings(SPI_LS_CLOCK, MSBFIRST, SPI_MODE3));
+  //   }
+  //   digitalWrite(_csPin,LOW); // select the MPU9250 chip
+  //   _spi->transfer(subAddress | SPI_READ); // specify the starting register address
+  //   for(uint8_t i = 0; i < count; i++){
+  //     dest[i] = _spi->transfer(0x00); // read the data
+  //   }
+  //   digitalWrite(_csPin,HIGH); // deselect the MPU9250 chip
+  //   _spi->endTransaction(); // end the transaction
+  //   return 1;
+  // }
+  // else{
+  //   _i2c->beginTransmission(_address); // open the device
+  //   _i2c->write(subAddress); // specify the starting register address
+  //   _i2c->endTransmission(false);
+  //   _numBytes = _i2c->requestFrom(_address, count); // specify the number of bytes to receive
+  //   if (_numBytes == count) {
+  //     for(uint8_t i = 0; i < count; i++){ 
+  //       dest[i] = _i2c->read();
+  //     }
+  //     return 1;
+  //   } else {
+  //     return -1;
+  //   }
+  // }
+}
+
+int MPU9250::writeRegisterBlocking(uint8_t subAddress,uint8_t data){
+
+  uint8_t fullCmd[2] ={0};
+  fullCmd[0] = subAddress;
+  fullCmd[1] = data;
+  _spi->setClock(1);
+  _spi->transferBlocking(fullCmd,2,NULL,0); // specify the starting register address
+  
+ delay(10);
+
+   /* read back the register */
+  readRegistersBlocking(subAddress,1,_buffer);
    
   /* check the read back register against the written register */
   if(_buffer[0] == data) {
@@ -1216,25 +1274,32 @@ int MPU9250::writeRegister(uint8_t subAddress, uint8_t data){
   else{
     return -1;
   }
+
+  return 1;
 }
 
-/* reads registers from MPU9250 given a starting register address, number of bytes, and a pointer to store data */
-int MPU9250::readRegisters(uint8_t subAddress, uint8_t count, uint8_t* dest){
+int MPU9250::readRegistersBlocking(uint8_t subAddress, uint8_t count, uint8_t* dest){
   if( _useSPI ){
     // begin the transaction
-    if(_useSPIHS){
-      _spi->beginTransaction(SPISettings(SPI_HS_CLOCK, MSBFIRST, SPI_MODE3));
-    }
-    else{
-      _spi->beginTransaction(SPISettings(SPI_LS_CLOCK, MSBFIRST, SPI_MODE3));
-    }
-    digitalWrite(_csPin,LOW); // select the MPU9250 chip
-    _spi->transfer(subAddress | SPI_READ); // specify the starting register address
-    for(uint8_t i = 0; i < count; i++){
-      dest[i] = _spi->transfer(0x00); // read the data
-    }
-    digitalWrite(_csPin,HIGH); // deselect the MPU9250 chip
-    _spi->endTransaction(); // end the transaction
+    // if(_useSPIHS){
+    //   _spi->beginTransaction(SPISettings(SPI_HS_CLOCK, MSBFIRST, SPI_MODE3));
+    // }
+    // else{
+    //   _spi->beginTransaction(SPISettings(SPI_LS_CLOCK, MSBFIRST, SPI_MODE3));
+    // }
+    //digitalWrite(_csPin,LOW); // select the MPU9250 chip
+    //TODO: Change to static allocated buff since we can limit hte max size.
+    _spi->setClock(8);
+    uint8_t* temp = (uint8_t*)malloc(count+1);
+    uint8_t cmd = subAddress | SPI_READ;
+    _spi->transferBlocking(&cmd,1,temp,count+1); // specify the starting register address
+    memcpy(dest,&temp[1],count);//Skip first byte garbage.
+    free(temp);
+    // for(uint8_t i = 0; i < count; i++){
+    //   dest[i] = _spi->transfer(0x00); // read the data
+    // }
+    // digitalWrite(_csPin,HIGH); // deselect the MPU9250 chip
+    // _spi->endTransaction(); // end the transaction
     return 1;
   }
   else{
@@ -1251,8 +1316,8 @@ int MPU9250::readRegisters(uint8_t subAddress, uint8_t count, uint8_t* dest){
       return -1;
     }
   }
-}
 
+}
 /* writes a register to the AK8963 given a register address and data */
 int MPU9250::writeAK8963Register(uint8_t subAddress, uint8_t data){
   // set slave 0 to the AK8963 and set for write
@@ -1305,7 +1370,7 @@ int MPU9250::readAK8963Registers(uint8_t subAddress, uint8_t count, uint8_t* des
 /* gets the MPU9250 WHO_AM_I register value, expected to be 0x71 */
 int MPU9250::whoAmI(){
   // read the WHO AM I register
-  if (readRegisters(WHO_AM_I,1,_buffer) < 0) {
+  if (readRegistersBlocking(WHO_AM_I,1,_buffer) < 0) {
     return -1;
   }
   // return the register value

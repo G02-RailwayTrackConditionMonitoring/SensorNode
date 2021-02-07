@@ -128,7 +128,7 @@ class MPU9250{
     size_t _numBytes; // number of bytes received from I2C
 
     // spi
-    SPIClass *_spi;
+    DMA_SPI *_spi;
     uint8_t _csPin;
     bool _useSPI;
     bool _useSPIHS;
@@ -296,7 +296,7 @@ class MPU9250{
     // private functions
     int writeRegister(uint8_t subAddress, uint8_t data);
     int readRegisters(uint8_t subAddress, uint8_t count, uint8_t* dest);
-    int writeRegistersBlocking(uint8_t subAddress,uint8_t data);
+    int writeRegisterBlocking(uint8_t subAddress,uint8_t data);
     int readRegistersBlocking(uint8_t subAddress, uint8_t count, uint8_t* dest);
     int writeAK8963Register(uint8_t subAddress, uint8_t data);
     int readAK8963Registers(uint8_t subAddress, uint8_t count, uint8_t* dest);
