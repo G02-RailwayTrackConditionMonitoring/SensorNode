@@ -25,6 +25,7 @@
 #include "Arduino.h"
 #include "Wire.h"    // I2C library
 #include "SPI.h"     // SPI library
+#include "DMA_SPI.h"
 
 class MPU9250{
   public:
@@ -68,7 +69,7 @@ class MPU9250{
       LP_ACCEL_ODR_500HZ = 11
     };
     MPU9250(TwoWire &bus,uint8_t address);
-    MPU9250(SPIClass &bus,uint8_t csPin);
+    MPU9250(DMA_SPI &bus,uint8_t csPin);
     int begin();
     int init(); // Modified begin to suit the needs of G02 Capstone project
     int setAccelRange(AccelRange range);
@@ -295,6 +296,8 @@ class MPU9250{
     // private functions
     int writeRegister(uint8_t subAddress, uint8_t data);
     int readRegisters(uint8_t subAddress, uint8_t count, uint8_t* dest);
+    int writeRegistersBlocking(uint8_t subAddress,uint8_t data);
+    int readRegistersBlocking(uint8_t subAddress, uint8_t count, uint8_t* dest);
     int writeAK8963Register(uint8_t subAddress, uint8_t data);
     int readAK8963Registers(uint8_t subAddress, uint8_t count, uint8_t* dest);
     int whoAmI();

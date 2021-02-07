@@ -30,7 +30,7 @@ MPU9250::MPU9250(TwoWire &bus,uint8_t address){
 }
 
 /* MPU9250 object, input the SPI bus and chip select pin */
-MPU9250::MPU9250(SPIClass &bus,uint8_t csPin){
+MPU9250::MPU9250(DMA_SPI &bus,uint8_t csPin){
   _spi = &bus; // SPI bus
   _csPin = csPin; // chip select pin
   _useSPI = true; // set to use SPI
@@ -616,13 +616,26 @@ int MPU9250FIFO::readFifo(float* xdata,float* ydata, float* zdata, uint8_t* numS
   // get the fifo size
   readRegisters(FIFO_COUNT, 2, _buffer); // read in both high and low bytes of fifo_count
   _fifoSize = (((uint16_t) (_buffer[0]&0x0F)) << 8) + (((uint16_t) _buffer[1]));
-
+  
   // // Display the length of the buffer in bytes, for troubleshooting purposes
   // Serial.begin(115200);
   // Serial.print("FIFO Size is: ");
   // Serial.print(_fifoSize);
   // Serial.println(" Bytes");
   // Serial.end();
+  // Serial.println("In read fifo");
+  // int16_t* testbuff[512];
+  // int16_t* testbufftx[512]={0};
+  // _spi->beginTransaction(SPISettings(SPI_HS_CLOCK, MSBFIRST, SPI_MODE3));
+  // digitalWrite(_csPin,LOW); // select the MPU9250 chip
+  //   _spi->transfer(FIFO_READ | SPI_READ); // specify the starting register address
+  //   // for(uint8_t i = 0; i < count; i++){
+  //   //   dest[i] = _spi->transfer(0x00); // read the data
+  //   // }
+  //   _spi->transfer(testbufftx,testbuff,_fifoSize);
+  //   // _spi->transfer(testbufftx,&testbuff[256],255);
+  //   digitalWrite(_csPin,HIGH); // deselect the MPU9250 chip
+    // _spi->endTransaction(); // end the transaction
 
   // read and parse the buffer
   for (size_t i=0; i < _fifoSize/_fifoFrameSize; i++) {

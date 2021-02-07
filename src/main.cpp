@@ -12,6 +12,7 @@
 #include "Resampler.h"
 #include "filter.h"
 
+#include "DMA_SPI.h"
 
 #ifdef NODE_1
 #define BUTTON_PIN  9
@@ -28,7 +29,7 @@
 #define IMU_SPI_SCK_PIN    11 
 #define IMU_SPI_CS_PIN     7
 //Setup a sepereate SPI bus for the IMU. 
-SPIClass IMU_SPI(NRF_SPIM2,IMU_SPI_MISO_PIN,IMU_SPI_SCK_PIN,IMU_SPI_MOSI_PIN);
+DMA_SPI IMU_SPI(NRF_SPIM3,IMU_SPI_MISO_PIN,IMU_SPI_SCK_PIN,IMU_SPI_MOSI_PIN,IMU_SPI_CS_PIN);
 
 // an MPU9250 object with the MPU-9250 sensor on SPI bus 0 and chip select pin 10
 MPU9250FIFO IMU(IMU_SPI,IMU_SPI_CS_PIN);
@@ -89,21 +90,23 @@ void setup() {
   //Pin for debuugging BLE. Goes high when in sendData function.
   pinMode(PIN_A0,OUTPUT);
   digitalWrite(PIN_A0,LOW);
+  pinMode(PIN_A1,OUTPUT);
+  digitalWrite(PIN_A1,LOW);
 
-  Serial.println("Starting BLE...");
+  // Serial.println("Starting BLE...");
 
-  #ifdef NODE_1
-  BLE_Stack.startBLE("G02_A");
-  #elif NODE_2
-  BLE_Stack.startBLE("G02_B");
-  #endif
+  // #ifdef NODE_1
+  // BLE_Stack.startBLE("G02_A");
+  // #elif NODE_2
+  // BLE_Stack.startBLE("G02_B");
+  // #endif
   
-  while(!BLE_Stack.isConnected()){
-    BLE_Stack.startAdvertising();
-    Serial.println("Connecting to BLE.");
-    delay(5000);
-  } // Wait to be connected.
-  delay(4000);//Wait for connectino to be good.
+  // while(!BLE_Stack.isConnected()){
+  //   BLE_Stack.startAdvertising();
+  //   Serial.println("Connecting to BLE.");
+  //   delay(5000);
+  // } // Wait to be connected.
+  // delay(4000);//Wait for connectino to be good.
   //Setup SD card with cs pin 2, max Freq 10MHz.
   if(!sd.begin(SdSpiConfig(SD_CS_PIN, SHARED_SPI, SPI_CLOCK))){
     Serial.println("Error initializing SD card...");
@@ -130,119 +133,127 @@ Serial.printf("Card size: %f\n",sd.card()->sectorCount()*512E-9);
     Serial.println("open failed");
   }
   
-  IMU.init(); // start communication with IMU   
-  IMU.enableAccelFifo(); // enabling the FIFO to record just the accelerometers
+  IMU_SPI.begin();
+  //IMU.init(); // start communication with IMU   
+  //IMU.enableAccelFifo(); // enabling the FIFO to record just the accelerometers
   Serial.println("Starting test");
   Serial.flush();
 }
   //Loop
 void loop(){
-
-  fifoSize = IMU.getFifoNumBytes()/6;
-  if(fifoSize<40){
-    delay(4); // Wait for another 20 samples.
+  uint8_t imu_id[2]={0};
+  uint8_t whoAmICmd[2] = {0x75|0x80,0};
+  IMU_SPI.transfer(&whoAmICmd,&imu_id,2);
+  while(!IMU_SPI.rxDone()){
+  } // wait for receive to be done.
+  Serial.printf("IMU id (0x%x): %x %x\n",&imu_id,imu_id[0],imu_id[1]);
+  Serial.flush();
+  delay(1000);
+  // fifoSize = IMU.getFifoNumBytes()/6;
+  // if(fifoSize<40){
+  //   delay(4); // Wait for another 20 samples.
     
-  }
-  else if(fifoSize>=40 && fifoSize<75){
-    delay((74-fifoSize)/8+1); // Delay proportional to number of samples needed.
+  // }
+  // else if(fifoSize>=40 && fifoSize<75){
+  //   delay((74-fifoSize)/8+1); // Delay proportional to number of samples needed.
     
-  }
-  else if(fifoSize>=75){
+  // }
+  // else if(fifoSize>=75){
     
-    IMU.readFifo(&acc_x[raw_data_offset],&acc_y[raw_data_offset],&acc_z[raw_data_offset],&numSamples); // read the fifo buffer from the IMU
-    //Serial.printf("reading imu: %d samples.\n",numSamples);
+  //   IMU.readFifo(&acc_x[raw_data_offset],&acc_y[raw_data_offset],&acc_z[raw_data_offset],&numSamples); // read the fifo buffer from the IMU
+  //   Serial.printf("reading imu: %d samples.\n",numSamples);
 
-    if(numSamples >80) numSamples = 80; //Just drop samples. If we don't then we just fall behind and drop more.
+  //   if(numSamples >80) numSamples = 80; //Just drop samples. If we don't then we just fall behind and drop more.
 
-    //If we have a left over sample from last read, we need to increase num samples.
-    if(raw_data_offset == 1){
-      numSamples = numSamples+1; // Add from the last one.
-      raw_data_offset =0; // reset
-    }
-    //We must process chunks that have length that is a multiple of the downsampling factor(2)
-    //If the sample length is odd we just do the first N-1 samples, and add the last sample to the beginning of the next chunk.
-    if(numSamples%2 != 0 ){
-      //Serial.println("Odd numer of samples!");
-      numSamples = numSamples-1; //Only process the first N-1 samples, which is an even chunk.
-      raw_data_offset = 1;  // We want to copy the next chunk starting at index 1 so we dont overwrite the last sample.
-    }
+  //   //If we have a left over sample from last read, we need to increase num samples.
+  //   if(raw_data_offset == 1){
+  //     numSamples = numSamples+1; // Add from the last one.
+  //     raw_data_offset =0; // reset
+  //   }
+  //   //We must process chunks that have length that is a multiple of the downsampling factor(2)
+  //   //If the sample length is odd we just do the first N-1 samples, and add the last sample to the beginning of the next chunk.
+  //   if(numSamples%2 != 0 ){
+  //     //Serial.println("Odd numer of samples!");
+  //     numSamples = numSamples-1; //Only process the first N-1 samples, which is an even chunk.
+  //     raw_data_offset = 1;  // We want to copy the next chunk starting at index 1 so we dont overwrite the last sample.
+  //   }
     
-    //Downsample each signal. Input is the 4kHz data stream, output is half the number of samples, into the output buffer. 
-    downsampler_x.downsample(acc_x,acc_x_2khz,numSamples);
-    downsampler_y.downsample(acc_y,acc_y_2khz,numSamples);
-    downsampler_z.downsample(acc_z,acc_z_2khz,numSamples);
+  //   //Downsample each signal. Input is the 4kHz data stream, output is half the number of samples, into the output buffer. 
+  //   downsampler_x.downsample(acc_x,acc_x_2khz,numSamples);
+  //   downsampler_y.downsample(acc_y,acc_y_2khz,numSamples);
+  //   downsampler_z.downsample(acc_z,acc_z_2khz,numSamples);
     
-    //Add one to num samples to get the original num samples.
-    if((numSamples+1)%2 != 0 ){
-      acc_x[0] = acc_x[numSamples]; //Copy the sample that was not processed to the begining of the buffer.
-      acc_y[0] = acc_y[numSamples];
-      acc_z[0] = acc_z[numSamples];  
-    }
+  //   //Add one to num samples to get the original num samples.
+  //   if((numSamples+1)%2 != 0 ){
+  //     acc_x[0] = acc_x[numSamples]; //Copy the sample that was not processed to the begining of the buffer.
+  //     acc_y[0] = acc_y[numSamples];
+  //     acc_z[0] = acc_z[numSamples];  
+  //   }
 
-    numSamples = numSamples/2; // Now we're working with the downsampled data.
-    //Serial.printf("acc_x_2k: %.15f ",acc_x_2khz[20]);
+  //   numSamples = numSamples/2; // Now we're working with the downsampled data.
+  //   //Serial.printf("acc_x_2k: %.15f ",acc_x_2khz[20]);
 
-    convert_to_int(acc_x_2khz,acc_x_int,numSamples,IMU.getAccelBiasX_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorX());
-    convert_to_int(acc_y_2khz,acc_y_int,numSamples,IMU.getAccelBiasY_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorY());
-    convert_to_int(acc_z_2khz,acc_z_int,numSamples,IMU.getAccelBiasZ_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorZ());
+  //   convert_to_int(acc_x_2khz,acc_x_int,numSamples,IMU.getAccelBiasX_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorX());
+  //   convert_to_int(acc_y_2khz,acc_y_int,numSamples,IMU.getAccelBiasY_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorY());
+  //   convert_to_int(acc_z_2khz,acc_z_int,numSamples,IMU.getAccelBiasZ_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorZ());
 
-    //Serial.printf("acc_x_int: %d",acc_x_int[20]);
+  //   //Serial.printf("acc_x_int: %d",acc_x_int[20]);
     
     
-    //Pack the data into x,y,z for writing to sd card.
-    int count=0;
-    for(int i=buffer_index; i< buffer_index+numSamples; i++){
-      //Serial.printf("x[%d]: %d\n",i,acc_x_int[i]);
+  //   //Pack the data into x,y,z for writing to sd card.
+  //   int count=0;
+  //   for(int i=buffer_index; i< buffer_index+numSamples; i++){
+  //     //Serial.printf("x[%d]: %d\n",i,acc_x_int[i]);
 
-      sdBuffer[i*3] = acc_x_int[count];
-      sdBuffer[(i*3)+1] = acc_y_int[count];
-      sdBuffer[(i*3)+2] = acc_z_int[count];
-      count++;
-    }
-    // long start = millis();
-    // //Send the data to the Gateway. numSamples will always be between 40 and 42, inclusive. 
-    // if(numSamples>40){
-      Serial.printf("Sending %d samples.\n",numSamples);
-    long start = millis();
-    BLE_Stack.sendData(sdBuffer,40*6);
-    Serial.printf("time ble: %d\n",millis()-start);
-    //   BLE_Stack.sendData(&sdBuffer[buffer_index],40*6);//Send up to 40 samples in one packet.
-    //   uint8_t overflow = numSamples-40; //Number of extra samples to deal with.
-    //   BLE_Stack.sendData(&sdBuffer[buffer_index+(40*6)], overflow*6);
-    // }
-    // else{
-    //   //There is exactly 40 samples, send in one go.
-    //   BLE_Stack.sendData(&sdBuffer[buffer_index], 40*6);
-    // }
-    // Serial.printf("BT send time: %d",millis()-start);
-    buffer_index += numSamples; 
-    //Serial.printf("buff idx: %d, fifoSize: %d, offset:%d \n",buffer_index,numSamples,raw_data_offset);
-    //Serial.flush();
+  //     sdBuffer[i*3] = acc_x_int[count];
+  //     sdBuffer[(i*3)+1] = acc_y_int[count];
+  //     sdBuffer[(i*3)+2] = acc_z_int[count];
+  //     count++;
+  //   }
+  //   // long start = millis();
+  //   // //Send the data to the Gateway. numSamples will always be between 40 and 42, inclusive. 
+  //   // if(numSamples>40){
+  //   //   Serial.printf("Sending %d samples.\n",numSamples);
+  //   // long start = millis();
+  //   // //BLE_Stack.sendData(sdBuffer,40*6);
+  //   // Serial.printf("time ble: %d\n",millis()-start);
+  //   //   BLE_Stack.sendData(&sdBuffer[buffer_index],40*6);//Send up to 40 samples in one packet.
+  //   //   uint8_t overflow = numSamples-40; //Number of extra samples to deal with.
+  //   //   BLE_Stack.sendData(&sdBuffer[buffer_index+(40*6)], overflow*6);
+  //   // }
+  //   // else{
+  //   //   //There is exactly 40 samples, send in one go.
+  //   //   BLE_Stack.sendData(&sdBuffer[buffer_index], 40*6);
+  //   // }
+  //   // Serial.printf("BT send time: %d",millis()-start);
+  //   buffer_index += numSamples; 
+  //   Serial.printf("buff idx: %d, fifoSize: %d, offset:%d \n",buffer_index,numSamples,raw_data_offset);
+  //   Serial.flush();
 
-    //Serial.flush();
-  }
+  //   //Serial.flush();
+  // }
 
-  if(buffer_index>75){
+  // if(buffer_index>73){
 
 
-    //Serial.flush();
+  //   //Serial.flush();
     
 
-    Serial.println("Writing to sd");
-    Serial.flush();
-    file.write(sdBuffer,buffer_index*6);
-    //file.sync(); // Sounds like this is needed? NO!
+  //   Serial.println("Writing to sd");
+  //   Serial.flush();
+  //   file.write(sdBuffer,buffer_index*6);
+  //   //file.sync(); // Sounds like this is needed? NO!
 
-    buffer_index = 0;
-  }
+  //   buffer_index = 0;
+  // }
 
-  if(digitalRead(BUTTON_PIN) == LOW ){
+  // if(digitalRead(BUTTON_PIN) == LOW ){
 
-    Serial.println("End of test...");
-    file.close();
-    Serial.flush();
-    while(1){};
-  }
+  //   Serial.println("End of test...");
+  //   file.close();
+  //   Serial.flush();
+  //   while(1){};
+  // }
 
 }
 
