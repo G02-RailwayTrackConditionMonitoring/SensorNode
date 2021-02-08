@@ -297,6 +297,7 @@ class MPU9250{
     int writeRegister(uint8_t subAddress, uint8_t data);
     int readRegisters(uint8_t subAddress, uint8_t count, uint8_t* dest);
     int writeRegisterBlocking(uint8_t subAddress,uint8_t data);
+    int writeRegisterBlocking(uint8_t subAddress,uint8_t data,bool check);
     int readRegistersBlocking(uint8_t subAddress, uint8_t count, uint8_t* dest);
     int writeAK8963Register(uint8_t subAddress, uint8_t data);
     int readAK8963Registers(uint8_t subAddress, uint8_t count, uint8_t* dest);
@@ -310,6 +311,7 @@ class MPU9250FIFO: public MPU9250 {
     int enableAccelFifo();
     int enableFifo(bool accel,bool gyro,bool mag,bool temp);
     int readFifo(float* xdata,float* ydata, float* zdata, uint8_t* numSamples);
+    int readFifo(uint8_t* input, float* xdata,float* ydata, float* zdata, uint8_t numSamples);
     //int readFifo();
     int readFifoInt(int16_t* xdata,int16_t* ydata, int16_t* zdata, uint8_t* numSamples, uint8_t downsampling_factor);
     int getFifoNumBytes();

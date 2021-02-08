@@ -44,6 +44,11 @@ int MPU9250::init(){
   digitalWrite(_csPin,HIGH); // setting CS pin high
   _spi->begin(); // begin SPI communication
 
+   //Reset device
+  writeRegisterBlocking(PWR_MGMNT_1,0x80);
+
+  delay(100);
+
   // Select clock source to PLL gyro reference once stable
   writeRegisterBlocking(PWR_MGMNT_1,CLOCK_SEL_PLL);
 
@@ -514,7 +519,7 @@ int MPU9250FIFO::enableAccelFifo() {
   Serial.println("In IMU enable FIFO");
   res = writeRegisterBlocking(USER_CTRL, (0x40 | I2C_MST_EN));
   Serial.printf("In IMU enable fifo, after userctrl: %d\n",res);
-  res = writeRegisterBlocking(FIFO_EN,FIFO_ACCEL);
+  res = writeRegisterBlocking(FIFO_EN,FIFO_ACCEL,false);
   Serial.printf("In IMU enable FIFO after command sent:%d\n",res);
 }
 
@@ -689,6 +694,30 @@ int MPU9250FIFO::readFifo(float* xdata,float* ydata, float* zdata, uint8_t* numS
   return 1;
 }
 
+int MPU9250FIFO::readFifo(uint8_t* input, float* xdata,float* ydata, float* zdata, uint8_t numSamples){
+  
+  
+  // read and parse the buffer
+  for (size_t i=0; i < numSamples; i++) {
+
+      // combine into 16 bit values
+      _axcounts = (((int16_t)input[i*SPI_BYTES_PER_BLOCK+1]) << 8) | input[i*SPI_BYTES_PER_BLOCK+2];  
+      _aycounts = (((int16_t)input[i*SPI_BYTES_PER_BLOCK+3]) << 8) | input[i*SPI_BYTES_PER_BLOCK+4];
+      _azcounts = (((int16_t)input[i*SPI_BYTES_PER_BLOCK+5]) << 8) | input[i*SPI_BYTES_PER_BLOCK+6];
+
+      Serial.printf("x:%d, y:%d, z:%d\n\r",_axcounts,_aycounts,_azcounts);
+      
+      
+      // transform and convert to float values
+      xdata[i] = (((float)(tX[0]*_axcounts + tX[1]*_aycounts + tX[2]*_azcounts) * _accelScale)-_axb)*_axs;
+      ydata[i] = (((float)(tY[0]*_axcounts + tY[1]*_aycounts + tY[2]*_azcounts) * _accelScale)-_ayb)*_ays;
+      zdata[i] = (((float)(tZ[0]*_axcounts + tZ[1]*_aycounts + tZ[2]*_azcounts) * _accelScale)-_azb)*_azs;
+      
+
+  }
+  return 1;
+
+}
 /* Reads in the FIFO data and stores it to "data". Stored x,y,z packed.
   The downsampling factor will result in an effective sampling rate of 4kHz/downsampling_factor.*/
 int MPU9250FIFO::readFifoInt(int16_t* xdata,int16_t* ydata, int16_t* zdata, uint8_t* numSamples, uint8_t downsampling_factor){
@@ -1275,6 +1304,31 @@ int MPU9250::writeRegisterBlocking(uint8_t subAddress,uint8_t data){
     return -1;
   }
 
+  return 1;
+}
+
+int MPU9250::writeRegisterBlocking(uint8_t subAddress,uint8_t data,bool check){
+
+  uint8_t fullCmd[2] ={0};
+  fullCmd[0] = subAddress;
+  fullCmd[1] = data;
+  _spi->setClock(1);
+  _spi->transferBlocking(fullCmd,2,NULL,0); // specify the starting register address
+  
+  if(check){
+ delay(10);
+
+   /* read back the register */
+  readRegistersBlocking(subAddress,1,_buffer);
+   
+  /* check the read back register against the written register */
+  if(_buffer[0] == data) {
+    return 1;
+  }
+  else{
+    return -1;
+  }
+  }
   return 1;
 }
 

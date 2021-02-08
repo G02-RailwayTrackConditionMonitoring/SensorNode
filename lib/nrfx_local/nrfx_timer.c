@@ -29,7 +29,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <nrfx.h>
+#include "nrfx.h"
 
 #if NRFX_CHECK(NRFX_TIMER_ENABLED)
 
