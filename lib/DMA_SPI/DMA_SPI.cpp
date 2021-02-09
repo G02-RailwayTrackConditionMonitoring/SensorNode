@@ -116,9 +116,9 @@ void DMA_SPI::setClock(uint8_t freq_MHz){
 void DMA_SPI::setup_recurring_timer(uint8_t delay_ms){
 
   //Boilerplate stuff, just assigning the TIMER0 struct.
-  tim0.cc_channel_count = TIMER0_CC_NUM;
-  tim0.instance_id = NRFX_TIMER0_INST_IDX;
-  tim0.p_reg = NRF_TIMER0;
+  tim0.cc_channel_count = TIMER3_CC_NUM;
+  tim0.instance_id = NRFX_TIMER3_INST_IDX;
+  tim0.p_reg = NRF_TIMER3;
 
   //Configure the timer , 32bit, 8Mhz clock, timer mode.
   nrfx_timer_config_t cfg;
@@ -145,7 +145,7 @@ void DMA_SPI::setup_recurring_timer(uint8_t delay_ms){
   tim1.cc_channel_count = TIMER1_CC_NUM;
   tim1.instance_id = NRFX_TIMER1_INST_IDX;
   tim1.p_reg = NRF_TIMER1;
-
+  
   //Configure the timer , 16bit, 16Mhz clock, counter.
   nrfx_timer_config_t cfg;
   cfg.frequency = NRF_TIMER_FREQ_16MHz;
@@ -191,13 +191,19 @@ void DMA_SPI::setup_tracking_counter(){
 
 void DMA_SPI::setupReccuringTransfer(){
 
+  // digitalToggle(PIN_A0);
+  Serial.println("Setting up block transfers...");
+  Serial.flush();
   //Setup the timer that controls how often the block transfers happen.
   setup_recurring_timer(blockDelay_ms);
 
   //Setup the counter for controlling the number of transfers per period.
   setup_recurring_counter(numBlocks);
 
+  //Setup the counter for counting how many blocks we have sent.
   setup_tracking_counter();
+
+
   //Setup the Programmable Peripheral Interconnect (PPI).
   //We want the timer CC event to trigger the START of the SPIM module.
   //Then the END event of the SPIM should activate the COUNT of the counter.
@@ -205,56 +211,54 @@ void DMA_SPI::setupReccuringTransfer(){
 
   //Allocate the PPI channels.
   nrfx_err_t err = nrfx_ppi_channel_alloc(&timerToSpi_PPI_CHAN);
-  //Serial.printf("PPI channe err: %x\n",err);
+  // Serial.printf("PPI channe err: %x\n",err);
   // err = nrfx_ppi_channel_alloc(&timerToCounter_PPI_CHAN);
-  // Serial.printf("PPI channe err: %x\n\r",err);
+  //Serial.printf("PPI channe err: %x\n\r",err);
   err = nrfx_ppi_channel_alloc(&SpiToCounter_PPI_CHAN);
-  //Serial.printf("PPI channe err: %x\n",err);
+  // Serial.printf("PPI channe err: %x\n",err);
   err = nrfx_ppi_channel_alloc(&CounterToSpi_PPI_CHAN);
-  //Serial.printf("PPI channe err: %x\n",err);
+  // Serial.printf("PPI channe err: %x\n",err);
   err = nrfx_ppi_channel_alloc(&spiToSpi_PPI_CHAN);
-  //Serial.printf("spi->spi PPI channel err: %x\n",err);
+  // Serial.printf("spi->spi PPI channel err: %x\n",err);
   err = nrfx_ppi_group_alloc(&ppiGroup);
-  //Serial.printf("group alloc err: %x\n",err);
+  // Serial.printf("group alloc err: %x\n",err);
 
   //Assign the ppi channel routing.
   err = nrfx_ppi_channel_assign(timerToSpi_PPI_CHAN,nrf_timer_event_address_get(tim0.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_START));
-  //Serial.printf("PPI assign timer to spi: %x\n\r",err);
+  // Serial.printf("PPI assign timer to spi: %x\n\r",err);
     //err = nrfx_ppi_channel_assign(timerToCounter_PPI_CHAN,nrf_timer_event_address_get(tim1.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_timer_task_address_get(tim2.p_reg,NRF_TIMER_TASK_COUNT));
   // Serial.printf("PPI assign timer to counter: %x\n\r",err);
   err = nrfx_ppi_channel_assign(SpiToCounter_PPI_CHAN,nrf_spim_event_address_get(_spim.p_reg,NRF_SPIM_EVENT_END),nrf_timer_task_address_get(tim1.p_reg,NRF_TIMER_TASK_COUNT));
-  //Serial.printf("PPI assign spi to counter: %x\n\r",err);
+  // Serial.printf("PPI assign spi to counter: %x\n\r",err);
   err = nrfx_ppi_channel_assign(CounterToSpi_PPI_CHAN,nrf_timer_event_address_get(tim1.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_STOP));
-  //Serial.printf("PPI assign counter to spi: %x\n\r",err);
+  // Serial.printf("PPI assign counter to spi: %x\n\r",err);
   err = nrfx_ppi_channel_assign(spiToSpi_PPI_CHAN,nrf_spim_event_address_get(_spim.p_reg,NRF_SPIM_EVENT_END),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_START));
-  //Serial.printf("PPI assign spi to spi: %x\n\r",err);
+  // Serial.printf("PPI assign spi to spi: %x\n\r",err);
 
   //Assign the spi->spi to a group so we can enable/disable it.
   err = nrfx_ppi_channel_include_in_group(spiToSpi_PPI_CHAN,ppiGroup);
-  //Serial.printf("PPI assign chan to group err: %x\n\r",err);
+  // Serial.printf("PPI assign chan to group err: %x\n\r",err);
 
   //Set forks for starting/stopping the spi channel.
   err = nrfx_ppi_channel_fork_assign(timerToSpi_PPI_CHAN,nrfx_ppi_task_addr_group_enable_get(ppiGroup));
-  //Serial.printf("PPI assign fork to enable group: %x\n\r",err);
-
+  // Serial.printf("PPI assign fork to enable group: %x\n\r",err);
   err = nrfx_ppi_channel_fork_assign(CounterToSpi_PPI_CHAN,nrfx_ppi_task_addr_group_disable_get(ppiGroup));
-  //Serial.printf("PPI assign fork to disable group: %x\n\r",err);
-
+  // Serial.printf("PPI assign fork to disable group: %x\n\r",err);
   err = nrfx_ppi_channel_fork_assign(SpiToCounter_PPI_CHAN,nrf_timer_task_address_get(tim2.p_reg,NRF_TIMER_TASK_COUNT));
-  Serial.printf("PPI assign fork to trackign counter: %x\n\r",err);
+  // Serial.printf("PPI assign fork to trackign counter: %x\n\r",err);
 
 
   //Enable the PPI channels
   err = nrfx_ppi_channel_enable(timerToSpi_PPI_CHAN);
-  Serial.printf("PPI enable timer to spi: %x\n\r",err);
+  // Serial.printf("PPI enable timer to spi: %x\n\r",err);
   //err = nrfx_ppi_channel_enable(timerToCounter_PPI_CHAN);
-  //Serial.printf("PPI enable timer to counter: %x\n\r",err);
+  // Serial.printf("PPI enable timer to counter: %x\n\r",err);
   err = nrfx_ppi_channel_enable(SpiToCounter_PPI_CHAN);
-  Serial.printf("PPI enable spi to counter: %x\n\r",err);
+  // Serial.printf("PPI enable spi to counter: %x\n\r",err);
   err = nrfx_ppi_channel_enable(CounterToSpi_PPI_CHAN);
-  Serial.printf("PPI enable counter to spi: %x\n\r",err);
+  // Serial.printf("PPI enable counter to spi: %x\n\r",err);
   err = nrfx_ppi_channel_enable(spiToSpi_PPI_CHAN);
-  Serial.printf("PPI enable spi to spi: %x\n\r",err);  
+  // Serial.printf("PPI enable spi to spi: %x\n\r",err);  
 
   // Have the end of one transmission start the next.
   //Apparently the STOP is ignored if shorts are enabled :(
@@ -264,6 +268,7 @@ void DMA_SPI::setupReccuringTransfer(){
   nrf_spim_rx_list_enable(_spim.p_reg);
   nrf_spim_tx_list_enable(_spim.p_reg);
 
+  //Use 8MHz SPI clock speed.
   setClock(8);
 
   //Setup the tx buffer.
@@ -283,7 +288,10 @@ void DMA_SPI::setupReccuringTransfer(){
   //Add one to the location because it skips one. Otherwise we lose the first byte (i.e. the command).
   memcpy(&tx_buffer[SPI_NUM_BLOCKS+1],&tx_buffer,SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
   memcpy(&tx_buffer[SPI_NUM_BLOCKS*2+2],&tx_buffer,SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
-  memcpy(&tx_buffer[SPI_NUM_BLOCKS*3+3],&tx_buffer,SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
+  //memcpy(&tx_buffer[SPI_NUM_BLOCKS*3+3],&tx_buffer,SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
+  //MAKE THIS AUTOMATIC!!!!!
+
+
   // //For debugging purpose, print the tx buff. Comment out later!
   // for(int i=0; i < SPI_NUM_BLOCKS*2;i++){
   //   Serial.printf("%d: ",i);
@@ -295,27 +303,36 @@ void DMA_SPI::setupReccuringTransfer(){
   //   Serial.flush();
   // }
 
-  //Setup time to keep track of how many times we have read the FIFO.
-
-
 }
 
 void DMA_SPI::startRecuringTransfers(){
 
+  // Serial.println("Starting recurring transfers...");
+  // Serial.flush();
 
   nrf_spim_rx_buffer_set(_spim.p_reg,&rx_buffer->buffer[0],SPI_BYTES_PER_BLOCK);
   nrf_spim_tx_buffer_set(_spim.p_reg,&tx_buffer->buffer[0],SPI_BYTES_PER_BLOCK);
 
+  // Serial.println("set buffers...");
+  // Serial.flush();
+
   //Start the timer.
   nrfx_timer_enable(&tim0);
 
+  // Serial.println("set tim0...");
+  // Serial.flush();
   //Start the counter.
   nrfx_timer_enable(&tim1);
   nrfx_timer_increment(&tim1); //Increment to deal with first time extra byte.
 
+  // Serial.println("set tim1...");
+  // Serial.flush();
   //Clear and start the tracking counter.
   nrfx_timer_enable(&tim2);
   nrfx_timer_clear(&tim2);
+
+  // Serial.println("set tim2...");
+  // Serial.flush();
 
 }
 

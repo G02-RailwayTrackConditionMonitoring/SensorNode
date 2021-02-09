@@ -20,7 +20,7 @@ void NodeBLE::startBLE(String deviceName){
     Bluefruit.setName(deviceName.c_str());
 
     Bluefruit.setTxPower(txPower);
-    Bluefruit.Periph.setConnInterval(minConnInterval,maxConnInterval);
+    //Bluefruit.Periph.setConnInterval(minConnInterval,maxConnInterval);
 
     Bluefruit.Periph.setDisconnectCallback(NodeBLE::disconnectedCallback);
     Bluefruit.Periph.setConnectCallback(NodeBLE::connectedCallback) ;

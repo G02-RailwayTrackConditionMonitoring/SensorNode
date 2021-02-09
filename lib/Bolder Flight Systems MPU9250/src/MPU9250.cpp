@@ -519,8 +519,11 @@ int MPU9250FIFO::enableAccelFifo() {
   Serial.println("In IMU enable FIFO");
   res = writeRegisterBlocking(USER_CTRL, (0x40 | I2C_MST_EN));
   Serial.printf("In IMU enable fifo, after userctrl: %d\n",res);
+  Serial.flush();
   res = writeRegisterBlocking(FIFO_EN,FIFO_ACCEL,false);
   Serial.printf("In IMU enable FIFO after command sent:%d\n",res);
+  Serial.flush();
+  return 1;
 }
 
 /* reads the most current data from MPU9250 and stores in buffer */
@@ -705,7 +708,7 @@ int MPU9250FIFO::readFifo(uint8_t* input, float* xdata,float* ydata, float* zdat
       _aycounts = (((int16_t)input[i*SPI_BYTES_PER_BLOCK+3]) << 8) | input[i*SPI_BYTES_PER_BLOCK+4];
       _azcounts = (((int16_t)input[i*SPI_BYTES_PER_BLOCK+5]) << 8) | input[i*SPI_BYTES_PER_BLOCK+6];
 
-      Serial.printf("x:%d, y:%d, z:%d\n\r",_axcounts,_aycounts,_azcounts);
+     // Serial.printf("x:%d, y:%d, z:%d\n\r",_axcounts,_aycounts,_azcounts);
       
       
       // transform and convert to float values
@@ -1316,18 +1319,18 @@ int MPU9250::writeRegisterBlocking(uint8_t subAddress,uint8_t data,bool check){
   _spi->transferBlocking(fullCmd,2,NULL,0); // specify the starting register address
   
   if(check){
- delay(10);
+    delay(10);
 
-   /* read back the register */
-  readRegistersBlocking(subAddress,1,_buffer);
-   
-  /* check the read back register against the written register */
-  if(_buffer[0] == data) {
-    return 1;
-  }
-  else{
-    return -1;
-  }
+      /* read back the register */
+      readRegistersBlocking(subAddress,1,_buffer);
+      
+      /* check the read back register against the written register */
+      if(_buffer[0] == data) {
+        return 1;
+      }
+      else{
+        return -1;
+      }
   }
   return 1;
 }

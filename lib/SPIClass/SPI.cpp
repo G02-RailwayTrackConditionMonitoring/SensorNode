@@ -79,9 +79,9 @@ void SPIClass::begin()
 
   nrfx_spim_config_t cfg =
   {
-    .sck_pin        = _uc_pinSCK,
-    .mosi_pin       = _uc_pinMosi,
-    .miso_pin       = _uc_pinMiso,
+    .sck_pin        = _uc_pinMosi,
+    .mosi_pin       = _uc_pinMiso,
+    .miso_pin       = _uc_pinSCK,
     .ss_pin         = NRFX_SPIM_PIN_NOT_USED,
     .ss_active_high = false,
     .irq_priority   = 3,
@@ -109,7 +109,7 @@ void SPIClass::begin()
                NRF_GPIO_PIN_H0H1,
                NRF_GPIO_PIN_NOSENSE);
 
-  nrf_gpio_cfg(_uc_pinMosi,
+  nrf_gpio_cfg(_uc_pinMiso,
                NRF_GPIO_PIN_DIR_OUTPUT,
                NRF_GPIO_PIN_INPUT_DISCONNECT,
                NRF_GPIO_PIN_NOPULL,

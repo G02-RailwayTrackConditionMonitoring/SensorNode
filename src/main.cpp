@@ -23,13 +23,13 @@
 #define BUTTON_PIN PIN_BUTTON1
 #endif
 
-#define LOGGING     0
+#define LOGGING     1
 
 //Pin numbers are MOSI: D13, MISO: D12, SCK:D11, CS: D10
-#define IMU_SPI_MOSI_PIN   13 
-#define IMU_SPI_MISO_PIN   12 
-#define IMU_SPI_SCK_PIN    11 
-#define IMU_SPI_CS_PIN     7
+#define IMU_SPI_MOSI_PIN   7 
+#define IMU_SPI_MISO_PIN   11 
+#define IMU_SPI_SCK_PIN    9 
+#define IMU_SPI_CS_PIN     10
 //Setup a sepereate SPI bus for the IMU. 
 DMA_SPI IMU_SPI(NRF_SPIM3,IMU_SPI_MISO_PIN,IMU_SPI_SCK_PIN,IMU_SPI_MOSI_PIN,IMU_SPI_CS_PIN);
 
@@ -70,7 +70,7 @@ int16_t sdBuffer[512];
 uint8_t imu_rx_buff_index=0;
 uint8_t imu_buffer[(SPI_NUM_BLOCKS*SPI_NUM_FIFO*SPI_BYTES_PER_BLOCK)];
 
-uint8_t mode =LOGGING;
+uint8_t mode =1;
 // //Double buffering for BLE transmit.
 // int16_t bleBuffA[240]; // BLE can transmit 244 bytes, so 240/6 = 40 samples at a time.
 // int16_t bleBuffB[240];
@@ -101,20 +101,20 @@ void setup() {
   pinMode(LED_BLUE,OUTPUT);
   pinMode(BUTTON_PIN,INPUT_PULLUP);
 
-  // Serial.println("Starting BLE...");
+  Serial.println("Starting BLE...");
 
-  // #ifdef NODE_1
-  // BLE_Stack.startBLE("G02_A");
-  // #elif NODE_2
-  // BLE_Stack.startBLE("G02_B");
-  // #endif
+  #ifdef NODE_1
+  BLE_Stack.startBLE("G02_A");
+  #elif NODE_2
+  BLE_Stack.startBLE("G02_B");
+  #endif
   
-  // while(!BLE_Stack.isConnected()){
-  //   BLE_Stack.startAdvertising();
-  //   Serial.println("Connecting to BLE.");
-  //   delay(5000);
-  // } // Wait to be connected.
-  // delay(4000);//Wait for connectino to be good.
+  while(!BLE_Stack.isConnected()){
+    BLE_Stack.startAdvertising();
+    Serial.println("Connecting to BLE.");
+    delay(5000);
+  } // Wait to be connected.
+  delay(10000);//Wait for connectino to be good.
   //Setup SD card with cs pin 2, max Freq 10MHz.
   if(!sd.begin(SdSpiConfig(SD_CS_PIN, SHARED_SPI, SPI_CLOCK))){
     Serial.println("Error initializing SD card...");
@@ -241,7 +241,7 @@ if(mode == LOGGING){
       // if(numSamples>40){
       //   Serial.printf("Sending %d samples.\n",numSamples);
       // long start = millis();
-      // //BLE_Stack.sendData(sdBuffer,40*6);
+      BLE_Stack.sendData(sdBuffer,40*6);
       // Serial.printf("time ble: %d\n",millis()-start);
       //   BLE_Stack.sendData(&sdBuffer[buffer_index],40*6);//Send up to 40 samples in one packet.
       //   uint8_t overflow = numSamples-40; //Number of extra samples to deal with.
@@ -277,11 +277,14 @@ if(mode == LOGGING){
 
       Serial.println("End of test...");
       file.close();
+      // IMU_SPI.pauseRecurringTransfers();
+      // IMU.haltSampleAccumulation();
       Serial.flush();
       while(1){};
     }
   }
-
+  digitalToggle(LED_BLUE);
+  Serial.println("Test");
   delay(5);
 }
 

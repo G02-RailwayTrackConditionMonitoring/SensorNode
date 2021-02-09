@@ -15,9 +15,10 @@
 #define NRFX_SPIM2_ENABLED           1
 
 #define NRFX_TIMER_ENABLED           1
-#define NRFX_TIMER0_ENABLED          1
+#define NRFX_TIMER3_ENABLED          1
 #define NRFX_TIMER1_ENABLED          1
 #define NRFX_TIMER2_ENABLED          1
+
 
 #define NRFX_PPI_ENABLED             1
 
