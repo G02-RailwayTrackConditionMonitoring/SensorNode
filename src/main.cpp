@@ -141,7 +141,8 @@ Serial.printf("Card size: %f\n",sd.card()->sectorCount()*512E-9);
     Serial.println("open failed");
   }
   Serial.flush();
-
+  
+  delay(2000);
   // IMU_SPI.begin();
   IMU.init(); // start communication with IMU   
   IMU.enableAccelFifo(); // enabling the FIFO to record just the accelerometers
