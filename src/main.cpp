@@ -145,10 +145,11 @@ Serial.printf("Card size: %f\n",sd.card()->sectorCount()*512E-9);
   
   delay(2000);
   // IMU_SPI.begin();
-  IMU.init(); // start communication with IMU   
-  IMU.enableAccelFifo(); // enabling the FIFO to record just the accelerometers
   IMU_SPI.setupReccuringTransfer();
   IMU_SPI.startRecuringTransfers();
+  IMU.init(); // start communication with IMU   
+  IMU.enableAccelFifo(); // enabling the FIFO to record just the accelerometers
+
   Serial.println("Starting test");
   Serial.flush();
 
@@ -193,7 +194,7 @@ if(mode == LOGGING){
       // else if(numSamples<80){
       //   numSamples +=2;
       // }
-      numSamples = 85;
+      numSamples = 80;
 
       Serial.printf("%d samples. (%x %x)\n\r",numSamples,imu_buffer[1],imu_buffer[2]);
 

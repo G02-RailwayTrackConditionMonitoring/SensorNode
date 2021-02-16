@@ -74,7 +74,7 @@ int MPU9250::init(){
 
 
   writeRegisterBlocking(INT_PIN_CFG,0x10); // INT high INT_STATUS is read, disable FSYNC, I2C bypass mode (doesn't matter since using SPI)
-   writeRegisterBlocking(INT_ENABLE,0x01); // Enable sample ready interrupt 
+  //  writeRegisterBlocking(INT_ENABLE,0x01); // Enable sample ready interrupt ->Moved to fifo enable function
   // // writeRegisterBlocking(USER_CTRL,0x40); // Enable FIFO
     return 1; //init was successful
 }
@@ -523,6 +523,7 @@ int MPU9250FIFO::enableAccelFifo() {
   res = writeRegisterBlocking(FIFO_EN,FIFO_ACCEL,false);
   Serial.printf("In IMU enable FIFO after command sent:%d\n",res);
   Serial.flush();
+  writeRegisterBlocking(INT_ENABLE,0x01);;
   return 1;
 }
 
