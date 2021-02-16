@@ -73,7 +73,7 @@ int MPU9250::init(){
 
 
 
-  writeRegisterBlocking(INT_PIN_CFG,0x10); // INT high INT_STATUS is read, disable FSYNC, I2C bypass mode (doesn't matter since using SPI)
+  writeRegisterBlocking(INT_PIN_CFG,0x30); // INT high INT_STATUS is read, disable FSYNC, I2C bypass mode (doesn't matter since using SPI)
    writeRegisterBlocking(INT_ENABLE,0x10); // Enable fifo overflow 
   // // writeRegisterBlocking(USER_CTRL,0x40); // Enable FIFO
     return 1; //init was successful

@@ -176,23 +176,24 @@ if(mode == LOGGING){
       IMU_SPI.getRxData(imu_buffer,imu_rx_buff_index,0);
       digitalWrite(PIN_A0,LOW);
 
-      numSamples = (((uint16_t) (imu_buffer[1]&0x0F)) << 8) + (((uint16_t) imu_buffer[2]));
-      if(numSamples%6 != 0){
+      // numSamples = (((uint16_t) (imu_buffer[1]&0x0F)) << 8) + (((uint16_t) imu_buffer[2]));
+      // if(numSamples%6 != 0){
         
-        //Do something...
-        Serial.println("ERROR Invalid number of samples! (%6 != 0)");
+      //   //Do something...
+      //   Serial.println("ERROR Invalid number of samples! (%6 != 0)");
 
-      }
-      numSamples = numSamples/6;
+      // }
+      // numSamples = numSamples/6;
 
       //It takes ~0.65 ms to read fifo. In that time 2 samples will be collected...
       //So since we read 81 samples each time, then num samples will be behind by 2, this corrects for that.
-      if(numSamples==80){
-        numSamples = 81;//At most we read 81, so if we got 80, we will have to get the next from the next frame.
-      }
-      else if(numSamples<80){
-        numSamples +=2;
-      }
+      // if(numSamples==80){
+      //   numSamples = 81;//At most we read 81, so if we got 80, we will have to get the next from the next frame.
+      // }
+      // else if(numSamples<80){
+      //   numSamples +=2;
+      // }
+      numSamples = 85;
 
       Serial.printf("%d samples. (%x %x)\n\r",numSamples,imu_buffer[1],imu_buffer[2]);
 

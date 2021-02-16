@@ -6,8 +6,9 @@
 #include "SPI.h"
 #include "nrfx_timer.h"
 #include "nrfx_ppi.h"
+#include "nrfx_gpiote.h"
 
-#define SPI_NUM_BLOCKS  61 //Fifo holds 85 samples, and the fifo size takes 1 more block.
+#define SPI_NUM_BLOCKS  85 //Fifo holds 85 samples, and the fifo size takes 1 more block.
 #define SPI_BYTES_PER_BLOCK 7   //Each "block" transfers one sample, which is 6 bytes, plus the command.
 #define SPI_BLOCK_DELAY_MS  15  //Fifo takes 21ms to fill, so 20ms is conservative.
 #define SPI_NUM_FIFO        3   //How many FIFOs we can read before we need CPU intervention.
@@ -97,6 +98,9 @@ private:
 
     //Handler for timer 1.
     static void tim1_handler(nrf_timer_event_t event_type, void* p_context);
+
+    //Handler for gpiote
+    static void gpiote_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action);
 
 };
 

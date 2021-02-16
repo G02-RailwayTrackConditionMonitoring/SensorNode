@@ -215,7 +215,7 @@ void DMA_SPI::setupReccuringTransfer(){
 
   //Allocate the PPI channels.
   nrfx_err_t err = nrfx_ppi_channel_alloc(&timerToSpi_PPI_CHAN);
-  // Serial.printf("PPI channe err: %x\n",err);
+   Serial.printf("PPI channe err: %x\n",err);
   // err = nrfx_ppi_channel_alloc(&timerToCounter_PPI_CHAN);
   //Serial.printf("PPI channe err: %x\n\r",err);
   err = nrfx_ppi_channel_alloc(&SpiToCounter_PPI_CHAN);
@@ -229,8 +229,8 @@ void DMA_SPI::setupReccuringTransfer(){
 
   //Assign the ppi channel routing.
   //err = nrfx_ppi_channel_assign(timerToSpi_PPI_CHAN,nrf_timer_event_address_get(tim0.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_START));
-  err = nrfx_ppi_channel_assign(timerToSpi_PPI_CHAN,nrfx_gpiote_in_event_get(11),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_START));
-  // Serial.printf("PPI assign timer to spi: %x\n\r",err);
+  err = nrfx_ppi_channel_assign(timerToSpi_PPI_CHAN,nrfx_gpiote_in_event_addr_get(11),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_START));
+   Serial.printf("PPI assign timer to spi: %x\n\r",err);
     //err = nrfx_ppi_channel_assign(timerToCounter_PPI_CHAN,nrf_timer_event_address_get(tim1.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_timer_task_address_get(tim2.p_reg,NRF_TIMER_TASK_COUNT));
   // Serial.printf("PPI assign timer to counter: %x\n\r",err);
   err = nrfx_ppi_channel_assign(SpiToCounter_PPI_CHAN,nrf_spim_event_address_get(_spim.p_reg,NRF_SPIM_EVENT_END),nrf_timer_task_address_get(tim1.p_reg,NRF_TIMER_TASK_COUNT));
@@ -279,13 +279,13 @@ void DMA_SPI::setupReccuringTransfer(){
   //Setup the tx buffer.
   for(int i=0; i<SPI_NUM_BLOCKS;i++){
 
-    //For the first transfer we want to read the fifo size.
-    if(i==0){
-      tx_buffer[i].buffer[0] = 0x72|0x80; //Read Fifo count | SPI_READ.
-    }
-    else{
+    // //For the first transfer we want to read the fifo size.
+    // if(i==0){
+    //   tx_buffer[i].buffer[0] = 0x72|0x80; //Read Fifo count | SPI_READ.
+    // }
+    // else{
       tx_buffer[i].buffer[0] = 0x74|0x80; //Read the fifo data.
-    }
+    // }
     // tx_buffer[i].buffer[0] = i;
   
   }
@@ -322,7 +322,7 @@ void DMA_SPI::startRecuringTransfers(){
   // Serial.flush();
 
   //Start the timer.
-  nrfx_timer_enable(&tim0);
+ // nrfx_timer_enable(&tim0);
 
   // Serial.println("set tim0...");
   // Serial.flush();
@@ -344,7 +344,7 @@ void DMA_SPI::startRecuringTransfers(){
 void DMA_SPI::pauseRecurringTransfers(){
 
   //Start the timer.
-  nrfx_timer_disable(&tim0);
+  //nrfx_timer_disable(&tim0);
 
   //Start the counter.
   nrfx_timer_disable(&tim1);
@@ -367,6 +367,12 @@ void DMA_SPI::tim1_handler(nrf_timer_event_t event_type, void* p_context){
   
   digitalToggle(PIN_A1);
   //Not really needed for the application but useful for debugging. 
+}
+
+void DMA_SPI::gpiote_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action){
+
+  digitalToggle(PIN_A0);
+  Serial.println("IMU Overflow");
 }
 
 uint16_t DMA_SPI::getRxBuffIndex(){
@@ -395,18 +401,25 @@ uint32_t DMA_SPI::getTimeUntilTransfer(){
 
 void DMA_SPI::setup_pinChange_event(){
 
-  //Setup a pin config for a rising edge detection, high-acc = true
+  // //Setup a pin config for a rising edge detection, high-acc = true
   nrfx_gpiote_in_config_t pinConfig = NRFX_GPIOTE_CONFIG_IN_SENSE_LOTOHI(true);
-
+  nrfx_err_t res;
   if(!nrfx_gpiote_is_init()){
     //If not already configured, initialize module.
-    nrfx_gpiote_init(NRFX_GPIOTE_DEFAULT_CONFIG_IRQ_PRIORITY);
+    res = nrfx_gpiote_init(NRFX_GPIOTE_DEFAULT_CONFIG_IRQ_PRIORITY);
+    Serial.printf("gpiote init err: %x\n\r",res);
   }
 
-  //pin 11 corresponds to D12
-  nrfx_gpiote_in_init(11,&pinConfig,NULL);
+// NRF_GPIOTE->CONFIG[0] = GPIOTE_CONFIG_MODE_Event << GPIOTE_CONFIG_MODE_Pos | 
+//                                          GPIOTE_CONFIG_POLARITY_LoToHi << GPIOTE_CONFIG_POLARITY_Pos | 
+//                                          11 << GPIOTE_CONFIG_PSEL_Pos | 
+//                                          GPIOTE_CONFIG_OUTINIT_High << GPIOTE_CONFIG_OUTINIT_Pos;    // ignored when gpio is set to event mode
+                                         
 
-  nrfx_gpiote_in_event_enable(11, false);
+  //pin 11 corresponds to D12
+  res = nrfx_gpiote_in_init(11,&pinConfig,gpiote_handler);
+  Serial.printf("gpiote pin config: %x\n\r",res);
+  nrfx_gpiote_in_event_enable(11, true);
 
 }
 
