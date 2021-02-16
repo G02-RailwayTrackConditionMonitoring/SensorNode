@@ -8,7 +8,7 @@
 #include "nrfx_ppi.h"
 #include "nrfx_gpiote.h"
 
-#define SPI_NUM_BLOCKS  85 //Fifo holds 85 samples, and the fifo size takes 1 more block.
+#define SPI_NUM_BLOCKS  80 //Fifo holds 85 samples, and the fifo size takes 1 more block.
 #define SPI_BYTES_PER_BLOCK 7   //Each "block" transfers one sample, which is 6 bytes, plus the command.
 #define SPI_BLOCK_DELAY_MS  15  //Fifo takes 21ms to fill, so 20ms is conservative.
 #define SPI_NUM_FIFO        3   //How many FIFOs we can read before we need CPU intervention.
@@ -74,6 +74,7 @@ private:
     ArrayList_t tx_buffer[SPI_NUM_BLOCKS*SPI_NUM_FIFO+(SPI_NUM_FIFO-1)*1];
 
     nrfx_timer_t tim0; //Used as a timer to initiate recurring block transfer.
+    nrfx_timer_t tim3; //Used to count the "sample ready" interrupts.
     nrfx_timer_t tim1; //Used as a couter for counting number of bytes transfered in each recurring block transfer.
     nrfx_timer_t tim2; //Used to count how many fifo reads we have done, so we know if there is data to transfer and reset buffers.
 
@@ -82,11 +83,12 @@ private:
     nrf_ppi_channel_t SpiToCounter_PPI_CHAN;
     nrf_ppi_channel_t CounterToSpi_PPI_CHAN;
     nrf_ppi_channel_t spiToSpi_PPI_CHAN;
-    nrf_ppi_channel_t timerToCounter_PPI_CHAN;
+    nrf_ppi_channel_t gpioteToCounter_PPI_CHAN;
     nrf_ppi_channel_group_t ppiGroup;
 
     void setup_recurring_timer(uint8_t delay_ms);
     void setup_recurring_counter(uint8_t num_transfer);
+    void setup_sample_counter(uint8_t numSamples);
     void setup_tracking_counter();
     void setup_pinChange_event();
 
