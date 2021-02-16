@@ -7,9 +7,9 @@
 #include "nrfx_timer.h"
 #include "nrfx_ppi.h"
 
-#define SPI_NUM_BLOCKS  82 //Fifo holds 85 samples, and the fifo size takes 1 more block.
+#define SPI_NUM_BLOCKS  61 //Fifo holds 85 samples, and the fifo size takes 1 more block.
 #define SPI_BYTES_PER_BLOCK 7   //Each "block" transfers one sample, which is 6 bytes, plus the command.
-#define SPI_BLOCK_DELAY_MS  20  //Fifo takes 21ms to fill, so 20ms is conservative.
+#define SPI_BLOCK_DELAY_MS  15  //Fifo takes 21ms to fill, so 20ms is conservative.
 #define SPI_NUM_FIFO        3   //How many FIFOs we can read before we need CPU intervention.
 
 typedef struct {
@@ -87,6 +87,7 @@ private:
     void setup_recurring_timer(uint8_t delay_ms);
     void setup_recurring_counter(uint8_t num_transfer);
     void setup_tracking_counter();
+    void setup_pinChange_event();
 
     //Handler called from the "event done" interrupt. Basically called when a transfer is complete.
     static void spi_handler(nrfx_spim_evt_t const * p_event,void *p_context);

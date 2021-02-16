@@ -5,6 +5,7 @@
 #include "nrfx_timer.h"
 #include "hal/nrf_timer.h"
 #include "nrfx_ppi.h"
+#include "nrfx_gpiote.h"
 
 void DMA_SPI::begin(){
 
@@ -107,6 +108,8 @@ void DMA_SPI::setClock(uint8_t freq_MHz){
             break;
     case 8: clockFreq = NRF_SPIM_FREQ_8M;
             break;
+    case 16: clockFreq = NRF_SPIM_FREQ_16M;
+            break;
     default:clockFreq = NRF_SPIM_FREQ_1M;
             break;
   }
@@ -195,7 +198,8 @@ void DMA_SPI::setupReccuringTransfer(){
   Serial.println("Setting up block transfers...");
   Serial.flush();
   //Setup the timer that controls how often the block transfers happen.
-  setup_recurring_timer(blockDelay_ms);
+  //setup_recurring_timer(blockDelay_ms);
+  setup_pinChange_event();
 
   //Setup the counter for controlling the number of transfers per period.
   setup_recurring_counter(numBlocks);
@@ -224,7 +228,8 @@ void DMA_SPI::setupReccuringTransfer(){
   // Serial.printf("group alloc err: %x\n",err);
 
   //Assign the ppi channel routing.
-  err = nrfx_ppi_channel_assign(timerToSpi_PPI_CHAN,nrf_timer_event_address_get(tim0.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_START));
+  //err = nrfx_ppi_channel_assign(timerToSpi_PPI_CHAN,nrf_timer_event_address_get(tim0.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_START));
+  err = nrfx_ppi_channel_assign(timerToSpi_PPI_CHAN,nrfx_gpiote_in_event_get(11),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_START));
   // Serial.printf("PPI assign timer to spi: %x\n\r",err);
     //err = nrfx_ppi_channel_assign(timerToCounter_PPI_CHAN,nrf_timer_event_address_get(tim1.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_timer_task_address_get(tim2.p_reg,NRF_TIMER_TASK_COUNT));
   // Serial.printf("PPI assign timer to counter: %x\n\r",err);
@@ -386,6 +391,23 @@ uint32_t DMA_SPI::getTimeUntilTransfer(){
     
     return 0;
   }
+}
+
+void DMA_SPI::setup_pinChange_event(){
+
+  //Setup a pin config for a rising edge detection, high-acc = true
+  nrfx_gpiote_in_config_t pinConfig = NRFX_GPIOTE_CONFIG_IN_SENSE_LOTOHI(true);
+
+  if(!nrfx_gpiote_is_init()){
+    //If not already configured, initialize module.
+    nrfx_gpiote_init(NRFX_GPIOTE_DEFAULT_CONFIG_IRQ_PRIORITY);
+  }
+
+  //pin 11 corresponds to D12
+  nrfx_gpiote_in_init(11,&pinConfig,NULL);
+
+  nrfx_gpiote_in_event_enable(11, false);
+
 }
 
 void DMA_SPI::getRxData(uint8_t* buff, uint8_t index,uint8_t numCopy){

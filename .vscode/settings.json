@@ -20,6 +20,9 @@
         "nrfx_config.h": "c",
         "nrf_spim.h": "c",
         "exception": "cpp",
-        "new": "cpp"
+        "new": "cpp",
+        "nrfx_gpiote.h": "c",
+        "nrf_gpiote.h": "c",
+        "nrf_gpio.h": "c"
     }
 }

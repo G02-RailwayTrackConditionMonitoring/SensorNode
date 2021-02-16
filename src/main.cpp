@@ -25,6 +25,7 @@
 
 #define LOGGING     1
 
+
 //Pin numbers are MOSI: D13, MISO: D12, SCK:D11, CS: D10
 #define IMU_SPI_MOSI_PIN   7 
 #define IMU_SPI_MISO_PIN   11 
@@ -101,20 +102,20 @@ void setup() {
   pinMode(LED_BLUE,OUTPUT);
   pinMode(BUTTON_PIN,INPUT_PULLUP);
 
-  Serial.println("Starting BLE...");
+  // Serial.println("Starting BLE...");
 
-  #ifdef NODE_1
-  BLE_Stack.startBLE("G02_A");
-  #elif NODE_2
-  BLE_Stack.startBLE("G02_B");
-  #endif
+  // #ifdef NODE_1
+  // BLE_Stack.startBLE("G02_A");
+  // #elif NODE_2
+  // BLE_Stack.startBLE("G02_B");
+  // #endif
   
-  while(!BLE_Stack.isConnected()){
-    BLE_Stack.startAdvertising();
-    Serial.println("Connecting to BLE.");
-    delay(5000);
-  } // Wait to be connected.
-  delay(10000);//Wait for connectino to be good.
+  // while(!BLE_Stack.isConnected()){
+  //   BLE_Stack.startAdvertising();
+  //   Serial.println("Connecting to BLE.");
+  //   delay(5000);
+  // } // Wait to be connected.
+  // delay(10000);//Wait for connectino to be good.
   //Setup SD card with cs pin 2, max Freq 10MHz.
   if(!sd.begin(SdSpiConfig(SD_CS_PIN, SHARED_SPI, SPI_CLOCK))){
     Serial.println("Error initializing SD card...");
@@ -174,8 +175,24 @@ if(mode == LOGGING){
       digitalWrite(PIN_A0,HIGH);
       IMU_SPI.getRxData(imu_buffer,imu_rx_buff_index,0);
       digitalWrite(PIN_A0,LOW);
+
       numSamples = (((uint16_t) (imu_buffer[1]&0x0F)) << 8) + (((uint16_t) imu_buffer[2]));
+      if(numSamples%6 != 0){
+        
+        //Do something...
+        Serial.println("ERROR Invalid number of samples! (%6 != 0)");
+
+      }
       numSamples = numSamples/6;
+
+      //It takes ~0.65 ms to read fifo. In that time 2 samples will be collected...
+      //So since we read 81 samples each time, then num samples will be behind by 2, this corrects for that.
+      if(numSamples==80){
+        numSamples = 81;//At most we read 81, so if we got 80, we will have to get the next from the next frame.
+      }
+      else if(numSamples<80){
+        numSamples +=2;
+      }
 
       Serial.printf("%d samples. (%x %x)\n\r",numSamples,imu_buffer[1],imu_buffer[2]);
 
@@ -242,7 +259,7 @@ if(mode == LOGGING){
       // if(numSamples>40){
       //   Serial.printf("Sending %d samples.\n",numSamples);
       // long start = millis();
-      BLE_Stack.sendData(sdBuffer,40*6);
+      // BLE_Stack.sendData(sdBuffer,40*6);
       // Serial.printf("time ble: %d\n",millis()-start);
       //   BLE_Stack.sendData(&sdBuffer[buffer_index],40*6);//Send up to 40 samples in one packet.
       //   uint8_t overflow = numSamples-40; //Number of extra samples to deal with.
