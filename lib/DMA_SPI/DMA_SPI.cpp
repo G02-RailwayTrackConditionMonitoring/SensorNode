@@ -265,45 +265,45 @@ void DMA_SPI::setupReccuringTransfer(){
 
   //Allocate the PPI channels.
   nrfx_err_t err = nrfx_ppi_channel_alloc(&timerToSpi_PPI_CHAN);
-   Serial.printf("PPI channe err: %x\n",err);
+  //  Serial.printf("PPI channe err: %x\n",err);
   err = nrfx_ppi_channel_alloc(&gpioteToCounter_PPI_CHAN);
-  Serial.printf("PPI channe err: %x\n\r",err);
+  // Serial.printf("PPI channe err: %x\n\r",err);
   err = nrfx_ppi_channel_alloc(&SpiToCounter_PPI_CHAN);
-  Serial.printf("PPI channe err: %x\n",err);
+  // Serial.printf("PPI channe err: %x\n",err);
   err = nrfx_ppi_channel_alloc(&CounterToSpi_PPI_CHAN);
-  Serial.printf("PPI channe err: %x\n",err);
+  // Serial.printf("PPI channe err: %x\n",err);
   err = nrfx_ppi_channel_alloc(&spiToSpi_PPI_CHAN);
-  Serial.printf("spi->spi PPI channel err: %x\n",err);
+  // Serial.printf("spi->spi PPI channel err: %x\n",err);
   err = nrfx_ppi_group_alloc(&ppiGroup);
-  Serial.printf("group alloc err: %x\n",err);
+  // Serial.printf("group alloc err: %x\n",err);
 
   //Assign the ppi channel routing.
 
   err = nrfx_ppi_channel_assign(gpioteToCounter_PPI_CHAN,nrfx_gpiote_in_event_addr_get(11),nrf_timer_task_address_get(tim3.p_reg,NRF_TIMER_TASK_COUNT));
-   Serial.printf("PPI assign gpiote to counter: %x\n\r",err);
+  //  Serial.printf("PPI assign gpiote to counter: %x\n\r",err);
   //err = nrfx_ppi_channel_assign(timerToSpi_PPI_CHAN,nrf_timer_event_address_get(tim0.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_START));
   err = nrfx_ppi_channel_assign(timerToSpi_PPI_CHAN,nrf_timer_event_address_get(tim3.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_START));
-   Serial.printf("PPI assign counter to spi: %x\n\r",err);
+  // Serial.printf("PPI assign counter to spi: %x\n\r",err);
     //err = nrfx_ppi_channel_assign(timerToCounter_PPI_CHAN,nrf_timer_event_address_get(tim1.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_timer_task_address_get(tim2.p_reg,NRF_TIMER_TASK_COUNT));
-  Serial.printf("PPI assign timer to counter: %x\n\r",err);
+  // Serial.printf("PPI assign timer to counter: %x\n\r",err);
   err = nrfx_ppi_channel_assign(SpiToCounter_PPI_CHAN,nrf_spim_event_address_get(_spim.p_reg,NRF_SPIM_EVENT_END),nrf_timer_task_address_get(tim1.p_reg,NRF_TIMER_TASK_COUNT));
-  Serial.printf("PPI assign spi to counter: %x\n\r",err);
+  // Serial.printf("PPI assign spi to counter: %x\n\r",err);
   err = nrfx_ppi_channel_assign(CounterToSpi_PPI_CHAN,nrf_timer_event_address_get(tim1.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_STOP));
-  Serial.printf("PPI assign counter to spi: %x\n\r",err);
+  // Serial.printf("PPI assign counter to spi: %x\n\r",err);
   err = nrfx_ppi_channel_assign(spiToSpi_PPI_CHAN,nrf_spim_event_address_get(_spim.p_reg,NRF_SPIM_EVENT_END),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_START));
-  Serial.printf("PPI assign spi to spi: %x\n\r",err);
+  // Serial.printf("PPI assign spi to spi: %x\n\r",err);
 
   //Assign the spi->spi to a group so we can enable/disable it.
   err = nrfx_ppi_channel_include_in_group(spiToSpi_PPI_CHAN,ppiGroup);
-  Serial.printf("PPI assign chan to group err: %x\n\r",err);
+  // Serial.printf("PPI assign chan to group err: %x\n\r",err);
 
   //Set forks for starting/stopping the spi channel.
   err = nrfx_ppi_channel_fork_assign(timerToSpi_PPI_CHAN,nrfx_ppi_task_addr_group_enable_get(ppiGroup));
-  Serial.printf("PPI assign fork to enable group: %x\n\r",err);
+  // Serial.printf("PPI assign fork to enable group: %x\n\r",err);
   err = nrfx_ppi_channel_fork_assign(CounterToSpi_PPI_CHAN,nrfx_ppi_task_addr_group_disable_get(ppiGroup));
-  Serial.printf("PPI assign fork to disable group: %x\n\r",err);
+  // Serial.printf("PPI assign fork to disable group: %x\n\r",err);
   err = nrfx_ppi_channel_fork_assign(SpiToCounter_PPI_CHAN,nrf_timer_task_address_get(tim2.p_reg,NRF_TIMER_TASK_COUNT));
-  Serial.printf("PPI assign fork to trackign counter: %x\n\r",err);
+  // Serial.printf("PPI assign fork to trackign counter: %x\n\r",err);
 
  
 
@@ -491,28 +491,28 @@ void DMA_SPI::getRxData(uint8_t* buff, uint8_t index,uint8_t numCopy){
    if(enable){
        //Enable the PPI channels
       nrfx_err_t err = nrfx_ppi_channel_enable(timerToSpi_PPI_CHAN);
-      Serial.printf("PPI enable timer to spi: %x\n\r",err);
+      // Serial.printf("PPI enable timer to spi: %x\n\r",err);
       err = nrfx_ppi_channel_enable(gpioteToCounter_PPI_CHAN);
-      Serial.printf("PPI enable timer to counter: %x\n\r",err);
+      // Serial.printf("PPI enable timer to counter: %x\n\r",err);
       err = nrfx_ppi_channel_enable(SpiToCounter_PPI_CHAN);
-      Serial.printf("PPI enable spi to counter: %x\n\r",err);
+      // Serial.printf("PPI enable spi to counter: %x\n\r",err);
       err = nrfx_ppi_channel_enable(CounterToSpi_PPI_CHAN);
-      Serial.printf("PPI enable counter to spi: %x\n\r",err);
+      // Serial.printf("PPI enable counter to spi: %x\n\r",err);
       err = nrfx_ppi_channel_enable(spiToSpi_PPI_CHAN);
-      Serial.printf("PPI enable spi to spi: %x\n\r",err);  
+      // Serial.printf("PPI enable spi to spi: %x\n\r",err);  
    }
    else{
        //Disable the PPI channels
       nrfx_err_t err = nrfx_ppi_channel_disable(timerToSpi_PPI_CHAN);
-      Serial.printf("PPI enable timer to spi: %x\n\r",err);
+      // Serial.printf("PPI enable timer to spi: %x\n\r",err);
       err = nrfx_ppi_channel_disable(gpioteToCounter_PPI_CHAN);
-      Serial.printf("PPI enable timer to counter: %x\n\r",err);
+      // Serial.printf("PPI enable timer to counter: %x\n\r",err);
       err = nrfx_ppi_channel_disable(SpiToCounter_PPI_CHAN);
-      Serial.printf("PPI enable spi to counter: %x\n\r",err);
+      // Serial.printf("PPI enable spi to counter: %x\n\r",err);
       err = nrfx_ppi_channel_disable(CounterToSpi_PPI_CHAN);
-      Serial.printf("PPI enable counter to spi: %x\n\r",err);
+      // Serial.printf("PPI enable counter to spi: %x\n\r",err);
       err = nrfx_ppi_channel_disable(spiToSpi_PPI_CHAN);
-      Serial.printf("PPI enable spi to spi: %x\n\r",err);  
+      // Serial.printf("PPI enable spi to spi: %x\n\r",err);  
 
    }
  }

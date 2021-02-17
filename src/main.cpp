@@ -79,8 +79,8 @@ typedef enum{
 //Double buffer for sd card.
 BufferSelection_t   sdBuff_selection = BUFF_A; 
 uint16_t            sdBuff_idx=0;
-int16_t             sdBufferA[SD_BUFFER_SIZE];
-int16_t             sdBufferB[SD_BUFFER_SIZE];
+uint8_t             sdBufferA[SD_BUFFER_SIZE] = {0};
+uint8_t             sdBufferB[SD_BUFFER_SIZE] = {0};
 
 uint8_t imu_num_frames=0;
 uint8_t imu_buffer[(SPI_NUM_BLOCKS*SPI_NUM_FIFO*SPI_BYTES_PER_BLOCK)];
@@ -190,43 +190,76 @@ if(mode == LOGGING){
         numSamples = 80;//We always read 80 samples.
 
         //Parse one frame into the sample values. This extracts the samples and converts to floating point.
-        IMU.readFifo(&imu_buffer[0],&acc_x[raw_data_offset],&acc_y[raw_data_offset],&acc_z[raw_data_offset],numSamples);
-
+        IMU.readFifo(&imu_buffer[frameNum],&acc_x[0],&acc_y[0],&acc_z[0],numSamples);
+        // Serial.printf("x0:%f y0:%f z0:%f\r\n",acc_x[0],acc_y[0],acc_z[0]);
         //Downsample each signal. Input is the 4kHz data stream, output is half the number of samples, into the output buffer. 
         downsampler_x.downsample(acc_x,acc_x_2khz,numSamples);
         downsampler_y.downsample(acc_y,acc_y_2khz,numSamples);
         downsampler_z.downsample(acc_z,acc_z_2khz,numSamples);
 
         numSamples = numSamples/2; // Now we're working with the downsampled data.
-
+        // Serial.printf("down x0:%f y0:%f z0:%f\r\n",acc_x_2khz[0],acc_y_2khz[0],acc_z_2khz[0]);
         //Convert our samples back to integer values. This is done since int16 is half the space of float32.
         convert_to_int(acc_x_2khz,acc_x_int,numSamples,IMU.getAccelBiasX_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorX());
         convert_to_int(acc_y_2khz,acc_y_int,numSamples,IMU.getAccelBiasY_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorY());
         convert_to_int(acc_z_2khz,acc_z_int,numSamples,IMU.getAccelBiasZ_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorZ());
-
+        Serial.printf("int x0:%d y0:%d z0:%d\r\n",acc_x_int[0],acc_y_int[0],acc_z_int[0]);
         //Pack the data into x,y,z for writing to sd card.
         mergeSampleStreams(mergedData, acc_x_int, acc_y_int, acc_z_int,numSamples);
+        Serial.printf("merged %x %x %x %x %x %x\r\n",mergedData[0],mergedData[1],mergedData[2],mergedData[3],mergedData[4],mergedData[5]);
 
+        //Now put  data into sd buffer and save to card if full.
         //We can fit all the samples in the current buffer.
+        Serial.printf("sd indx:%d\r\n",sdBuff_idx);
         if(numSamples*6 + sdBuff_idx<SD_BUFFER_SIZE){
-
+          Serial.println("single buff");
           if(sdBuff_selection == BUFF_A){
-            memcpy(&sdBufferA[sdBuff_idx],mergedData,numSamples*6);
+            memcpy(&sdBufferA[sdBuff_idx],&mergedData[0],numSamples*6);
           }
           else if(sdBuff_selection == BUFF_B){
-            memcpy(&sdBufferB[sdBuff_idx],mergedData,numSamples*6);
+            memcpy(&sdBufferB[sdBuff_idx],&mergedData[0],numSamples*6);
           }
-
+          Serial.printf("A %x %x %x %x %x %x\r\n",sdBufferA[sdBuff_idx+0],sdBufferA[sdBuff_idx+1],sdBufferA[sdBuff_idx+2],sdBufferA[sdBuff_idx+3],sdBufferA[sdBuff_idx+4],sdBufferA[sdBuff_idx+5]);
+          Serial.printf("B %x %x %x %x %x %x\r\n",sdBufferB[sdBuff_idx+0],sdBufferB[sdBuff_idx+1],sdBufferB[sdBuff_idx+2],sdBufferB[sdBuff_idx+3],sdBufferB[sdBuff_idx+4],sdBufferB[sdBuff_idx+5]);
+          sdBuff_idx += (numSamples*6);
         }
         else{
+          Serial.println("cross buff");
           //We split the 40 samples across the buffers.
           uint16_t bytesInPrevBuff = SD_BUFFER_SIZE - sdBuff_idx;
           uint16_t bytesLeft = (numSamples*6) - bytesInPrevBuff;
 
-          for(int i=0; i< bytesInPrevBuff; i+=2)
+          //Copy as much data as fits, then switch buffers.
+          //Write the full buffer to the card.
+          if(sdBuff_selection == BUFF_A){
+              memcpy(&sdBufferA[sdBuff_idx],mergedData,bytesInPrevBuff);
+              sdBuff_selection = BUFF_B; 
+              sdBuff_idx = 0;
+
+              file.write(sdBufferA,SD_BUFFER_SIZE);
+              memset(sdBufferA,0,SD_BUFFER_SIZE);
+          }
+          else if(sdBuff_selection == BUFF_B){
+              memcpy(&sdBufferB[sdBuff_idx],mergedData,bytesInPrevBuff);
+              sdBuff_selection = BUFF_A; 
+              sdBuff_idx = 0;
+
+              file.write(sdBufferB,SD_BUFFER_SIZE);
+              memset(sdBufferB,0,SD_BUFFER_SIZE);
+          }
+
+          //Put rest of data into other buffer...
+          if(sdBuff_selection == BUFF_A){
+              memcpy(&sdBufferA[sdBuff_idx],&mergedData[bytesInPrevBuff],bytesLeft);
+          }
+          else if(sdBuff_selection == BUFF_B){
+              memcpy(&sdBufferB[sdBuff_idx],&mergedData[bytesInPrevBuff],bytesLeft);
+          }
+          sdBuff_idx += bytesLeft;
+
         }
         
-
+        Serial.flush();
       }
 
       
@@ -293,23 +326,23 @@ if(mode == LOGGING){
       //   BLE_Stack.sendData(&sdBuffer[sd_], 40*6);
       // }
       // Serial.printf("BT send time: %d",millis()-start);
-      sd_ += numSamples; 
-      Serial.printf("buff idx: %d, fifoSize: %d, offset:%d \n\r",sd_,numSamples,raw_data_offset);
-      Serial.flush();
+      // sd_ += numSamples; 
+      // Serial.printf("buff idx: %d, fifoSize: %d, offset:%d \n\r",sd_,numSamples,raw_data_offset);
+      // Serial.flush();
       digitalWrite(PIN_A0,LOW);
 
       //Serial.flush();
     }
 
-    if(sd_>73){
+    // if(sd_>73){
 
-      Serial.println("Writing to sd");
-      Serial.flush();
-      file.write(sdBuffer,sd_*6);
-      //file.sync(); // Sounds like this is needed? NO!
+    //   Serial.println("Writing to sd");
+    //   Serial.flush();
+    //   file.write(sdBuffer,sd_*6);
+    //   //file.sync(); // Sounds like this is needed? NO!
 
-      sd_ = 0;
-    }
+    //   sd_ = 0;
+    // }
 
     if(digitalRead(BUTTON_PIN) == LOW ){
 
@@ -342,10 +375,16 @@ void mergeSampleStreams(uint8_t* outBuff, int16_t* in1, int16_t* in2, int16_t* i
 
     uint16_t count = 0;
     for(int i=0; i<numSamples; i++){
-  
-      outBuff[i*3] = in1[count];
-      outBuff[(i*3)+1] = in2[count];
-      outBuff[(i*3)+2] = in3[count];
+      
+      //Get pointers to where each axis sample should go.
+      int16_t* x_pos = (int16_t*)&outBuff[i*6];
+      int16_t* y_pos = (int16_t*)&outBuff[i*6+2];
+      int16_t* z_pos = (int16_t*)&outBuff[i*6+4];
+
+      *x_pos = in1[count];
+      *y_pos = in2[count];
+      *z_pos = in3[count];
+
       count++;
 
     }

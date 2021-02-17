@@ -72,10 +72,8 @@ int MPU9250::init(){
   _srd = 0;
 
 
-
-  writeRegisterBlocking(INT_PIN_CFG,0x10); // INT high INT_STATUS is read, disable FSYNC, I2C bypass mode (doesn't matter since using SPI)
-  //  writeRegisterBlocking(INT_ENABLE,0x01); // Enable sample ready interrupt ->Moved to fifo enable function
-  // // writeRegisterBlocking(USER_CTRL,0x40); // Enable FIFO
+  //Bit 4 must be zero for our application! The interrupt should not be set to clear on any read!!! 
+  writeRegisterBlocking(INT_PIN_CFG,0x00); // INT high INT_STATUS is read, disable FSYNC, I2C bypass mode (doesn't matter since using SPI)
     return 1; //init was successful
 }
 
