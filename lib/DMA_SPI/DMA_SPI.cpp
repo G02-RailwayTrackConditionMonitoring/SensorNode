@@ -337,7 +337,7 @@ void DMA_SPI::setupReccuringTransfer(){
   // memcpy(&tx_buffer[SPI_NUM_BLOCKS+1],&tx_buffer,SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
   // memcpy(&tx_buffer[SPI_NUM_BLOCKS*2+2],&tx_buffer,SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
   //memcpy(&tx_buffer[SPI_NUM_BLOCKS*3+3],&tx_buffer,SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
-  //MAKE THIS AUTOMATIC!!!!!
+  //MAKE THIS AUTOMATIC!!!!! -> Done
 
 
   // //For debugging purpose, print the tx buff. Comment out later!
@@ -470,18 +470,50 @@ void DMA_SPI::getRxData(uint8_t* buff, uint8_t index,uint8_t numCopy){
   
   for(int i=0; i<index;i++){
 
-    //   for(int j=0; j<20;j++){
-    //   Serial.printf("%x, ",*(&(rx_buffer[i*(SPI_NUM_BLOCKS+1)].buffer[0])+j));
-    // }
-    // Serial.printf("rx_addr: %x\n\r",&(rx_buffer[i*(SPI_NUM_BLOCKS+1)].buffer[0]));
-    memcpy(&buff[i*SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK],&(rx_buffer[i*(SPI_NUM_BLOCKS+1)].buffer[0]),SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
+  // // for(int i= 0; i<index;i++){
+
+  //     for(int j=0;j<80;j++){
+
+  //       for(int k=0; k<7;k++){
+  //         Serial.printf("%x, ",rx_buffer[j+(80*i)].buffer[k]);
+
+  //       }
+  //       Serial.println(" ");
+  //     }
+
+  //     Serial.println(" ");
+
+    for(int j=0; j<80; j++){
+      
+      //Increment buff index by bytes/block for each sample(j). Then for each frame(i) the buff index just increase by the frame size in bytes.
+      //The rx buff index increses by 1, since rx_buff[x] holds bytes/block bytes. Then for each frame we have to skip one sample, which propagates forward hence the i*80+i.
+      memcpy(&buff[j*SPI_BYTES_PER_BLOCK+i*80*SPI_BYTES_PER_BLOCK],&(rx_buffer[j+(i*80+i)].buffer[0]),SPI_BYTES_PER_BLOCK);
+    }
+
+    // memcpy(&buff[i*SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK],&(rx_buffer[i*(SPI_NUM_BLOCKS+1)].buffer[0]),SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
   }
-  
+
   //Reset our transfers
   nrf_spim_rx_buffer_set(_spim.p_reg,&rx_buffer->buffer[0],SPI_BYTES_PER_BLOCK);
   nrf_spim_tx_buffer_set(_spim.p_reg,&tx_buffer->buffer[0],SPI_BYTES_PER_BLOCK);
 
   nrfx_timer_clear(&tim2);
+  
+  // for(int i= 0; i<index;i++){
+
+  //     for(int j=0;j<80;j++){
+
+  //       for(int k=0; k<7;k++){
+  //         Serial.printf("%x, ",buff[i*SPI_BYTES_PER_BLOCK*SPI_NUM_BLOCKS + j*SPI_BYTES_PER_BLOCK+k]);
+
+  //       }
+  //       Serial.println(" ");
+  //     }
+
+  //     Serial.println(" ");
+  // }
+
+
 
 }
 
