@@ -190,7 +190,7 @@ if(mode == LOGGING){
         numSamples = 80;//We always read 80 samples.
 
         //Parse one frame into the sample values. This extracts the samples and converts to floating point.
-        IMU.readFifo(&imu_buffer[frameNum],&acc_x[0],&acc_y[0],&acc_z[0],numSamples);
+        IMU.readFifo(&imu_buffer[frameNum*SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK],&acc_x[0],&acc_y[0],&acc_z[0],numSamples);
         // Serial.printf("x0:%f y0:%f z0:%f\r\n",acc_x[0],acc_y[0],acc_z[0]);
         //Downsample each signal. Input is the 4kHz data stream, output is half the number of samples, into the output buffer. 
         downsampler_x.downsample(acc_x,acc_x_2khz,numSamples);
