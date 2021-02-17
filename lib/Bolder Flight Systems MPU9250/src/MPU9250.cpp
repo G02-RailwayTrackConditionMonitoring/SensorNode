@@ -523,7 +523,7 @@ int MPU9250FIFO::enableAccelFifo() {
   res = writeRegisterBlocking(FIFO_EN,FIFO_ACCEL,false);
   Serial.printf("In IMU enable FIFO after command sent:%d\n",res);
   Serial.flush();
-  writeRegisterBlocking(INT_ENABLE,0x01);;
+  writeRegisterBlocking(INT_ENABLE,0x01,false);;
   return 1;
 }
 

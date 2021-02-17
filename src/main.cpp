@@ -49,26 +49,40 @@ ExFatFile file;
 uint16_t numSamples;
 size_t fifoSize;
 
+//Terminology: IMU Frame-> A chunk of samples read from the imu (one fifo's worth).
+//             SPI_NUM_BLOCKS-> The number of samples in one frame
+
 //These hold the 4kHz imu data streams. Fifo holds up to 85 samples, and we need one extra space for if we have odd number of samples.
 uint8_t raw_data_offset = 0;
-float acc_x[86];
-float acc_y[86];
-float acc_z[86];
+float acc_x[SPI_NUM_BLOCKS];
+float acc_y[SPI_NUM_BLOCKS];
+float acc_z[SPI_NUM_BLOCKS];
 
 //Holds the downsampled data streams, so we only need half the amount of space (43 samples).
-float acc_x_2khz[43];
-float acc_y_2khz[43];
-float acc_z_2khz[43];
+float acc_x_2khz[SPI_NUM_BLOCKS/2];
+float acc_y_2khz[SPI_NUM_BLOCKS/2];
+float acc_z_2khz[SPI_NUM_BLOCKS/2];
 
 //Holds the downsampled data streams but in int form which is needed for transmitting and saving to SD card.
-int16_t acc_x_int[43];
-int16_t acc_y_int[43];
-int16_t acc_z_int[43];
+int16_t acc_x_int[SPI_NUM_BLOCKS/2];
+int16_t acc_y_int[SPI_NUM_BLOCKS/2];
+int16_t acc_z_int[SPI_NUM_BLOCKS/2];
 
-uint8_t buffer_index=0;//Keeps track of how many samples in the acc_x,acc_y,acc_z / sd buffer.
-int16_t sdBuffer[512];
+//Holds the packed data (x,y,z).
+uint8_t mergedData[SPI_NUM_BLOCKS*6]; 
 
-uint8_t imu_rx_buff_index=0;
+typedef enum{
+  BUFF_A,
+  BUFF_B
+} BufferSelection_t;
+#define SD_BUFFER_SIZE  512
+//Double buffer for sd card.
+BufferSelection_t   sdBuff_selection = BUFF_A; 
+uint16_t            sdBuff_idx=0;
+int16_t             sdBufferA[SD_BUFFER_SIZE];
+int16_t             sdBufferB[SD_BUFFER_SIZE];
+
+uint8_t imu_num_frames=0;
 uint8_t imu_buffer[(SPI_NUM_BLOCKS*SPI_NUM_FIFO*SPI_BYTES_PER_BLOCK)];
 
 uint8_t mode =1;
@@ -79,12 +93,12 @@ uint8_t mode =1;
 // uint8_t bleBuffIdxB =0;
 
 //We need a downsampler for each signal.
-Downsampler downsampler_x(2,anitaliasing_filter,FILTER_TAP_NUM,86);
-Downsampler downsampler_y(2,anitaliasing_filter,FILTER_TAP_NUM,86);
-Downsampler downsampler_z(2,anitaliasing_filter,FILTER_TAP_NUM,86);
+Downsampler downsampler_x(2,anitaliasing_filter,FILTER_TAP_NUM,80);
+Downsampler downsampler_y(2,anitaliasing_filter,FILTER_TAP_NUM,80);
+Downsampler downsampler_z(2,anitaliasing_filter,FILTER_TAP_NUM,80);
 
 void  convert_to_int(float* in, int16_t* out, int num_samples, float bias, float scale, float axis_scale);
-
+void mergeSampleStreams(uint8_t* outBuff, int16_t* in1, int16_t* in2, int16_t* in3, uint16_t numSamples);
 void test_downsampling();
 
 void setup() {
@@ -146,10 +160,10 @@ Serial.printf("Card size: %f\n",sd.card()->sectorCount()*512E-9);
   delay(2000);
   // IMU_SPI.begin();
   IMU_SPI.setupReccuringTransfer();
-  IMU_SPI.startRecuringTransfers();
   IMU.init(); // start communication with IMU   
   IMU.enableAccelFifo(); // enabling the FIFO to record just the accelerometers
 
+  IMU_SPI.startRecuringTransfers();
   Serial.println("Starting test");
   Serial.flush();
 
@@ -159,103 +173,110 @@ Serial.printf("Card size: %f\n",sd.card()->sectorCount()*512E-9);
 void loop(){
 
 if(mode == LOGGING){
-  //   fifoSize = IMU.getFifoNumBytes()/6;
-  //   if(fifoSize<40){
-  //     delay(4); // Wait for another 20 samples.
-      
-  //   }
-  //   else if(fifoSize>=40 && fifoSize<75){
-  //     delay((74-fifoSize)/8+1); // Delay proportional to number of samples needed.
-      
-  //   }
-    if((imu_rx_buff_index = IMU_SPI.getRxBuffIndex())){
-      // uint8_t nm_smp;
-      // IMU.readFifo(&acc_x[raw_data_offset],&acc_y[raw_data_offset],&acc_z[raw_data_offset],&nm_smp); // read the fifo buffer from the IMU
+
+    //Check if we have any frames available
+    if((imu_num_frames = IMU_SPI.getRxBuffIndex())){
+
+      digitalWrite(PIN_A0,HIGH);
       Serial.printf("reading imu:");
       Serial.flush();
-      digitalWrite(PIN_A1,HIGH);
-      IMU_SPI.getRxData(imu_buffer,imu_rx_buff_index,0);
-      digitalWrite(PIN_A1,LOW);
-
-      // numSamples = (((uint16_t) (imu_buffer[1]&0x0F)) << 8) + (((uint16_t) imu_buffer[2]));
-      // if(numSamples%6 != 0){
+      
+      //Copy the data from the SPI dma buffer, to our local buffer so we can reset the spi dma buffer.
+      IMU_SPI.getRxData(imu_buffer,imu_num_frames,0);
+      Serial.printf("%d frames. \n\r",imu_num_frames);
+      
+      for(int frameNum=0; frameNum<imu_num_frames; frameNum++){
         
-      //   //Do something...
-      //   Serial.println("ERROR Invalid number of samples! (%6 != 0)");
+        numSamples = 80;//We always read 80 samples.
 
-      // }
-      // numSamples = numSamples/6;
+        //Parse one frame into the sample values. This extracts the samples and converts to floating point.
+        IMU.readFifo(&imu_buffer[0],&acc_x[raw_data_offset],&acc_y[raw_data_offset],&acc_z[raw_data_offset],numSamples);
 
-      //It takes ~0.65 ms to read fifo. In that time 2 samples will be collected...
-      //So since we read 81 samples each time, then num samples will be behind by 2, this corrects for that.
-      // if(numSamples==80){
-      //   numSamples = 81;//At most we read 81, so if we got 80, we will have to get the next from the next frame.
-      // }
-      // else if(numSamples<80){
-      //   numSamples +=2;
-      // }
-      numSamples = 80;
+        //Downsample each signal. Input is the 4kHz data stream, output is half the number of samples, into the output buffer. 
+        downsampler_x.downsample(acc_x,acc_x_2khz,numSamples);
+        downsampler_y.downsample(acc_y,acc_y_2khz,numSamples);
+        downsampler_z.downsample(acc_z,acc_z_2khz,numSamples);
 
-      Serial.printf("%d samples. (%x %x)\n\r",numSamples,imu_buffer[1],imu_buffer[2]);
+        numSamples = numSamples/2; // Now we're working with the downsampled data.
 
-      // for(int i=0;i<numSamples;i++){
+        //Convert our samples back to integer values. This is done since int16 is half the space of float32.
+        convert_to_int(acc_x_2khz,acc_x_int,numSamples,IMU.getAccelBiasX_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorX());
+        convert_to_int(acc_y_2khz,acc_y_int,numSamples,IMU.getAccelBiasY_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorY());
+        convert_to_int(acc_z_2khz,acc_z_int,numSamples,IMU.getAccelBiasZ_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorZ());
 
-      //   for(int j=0; j<SPI_BYTES_PER_BLOCK;j++){
+        //Pack the data into x,y,z for writing to sd card.
+        mergeSampleStreams(mergedData, acc_x_int, acc_y_int, acc_z_int,numSamples);
 
-      //     Serial.printf("%x, ",imu_buffer[i*SPI_BYTES_PER_BLOCK+j]);
-      //   }
-      //   Serial.printf("\n\r");
-      // }
-      // Serial.flush();
-      IMU.readFifo(&imu_buffer[7],&acc_x[raw_data_offset],&acc_y[raw_data_offset],&acc_z[raw_data_offset],numSamples);
+        //We can fit all the samples in the current buffer.
+        if(numSamples*6 + sdBuff_idx<SD_BUFFER_SIZE){
 
+          if(sdBuff_selection == BUFF_A){
+            memcpy(&sdBufferA[sdBuff_idx],mergedData,numSamples*6);
+          }
+          else if(sdBuff_selection == BUFF_B){
+            memcpy(&sdBufferB[sdBuff_idx],mergedData,numSamples*6);
+          }
+
+        }
+        else{
+          //We split the 40 samples across the buffers.
+          uint16_t bytesInPrevBuff = SD_BUFFER_SIZE - sdBuff_idx;
+          uint16_t bytesLeft = (numSamples*6) - bytesInPrevBuff;
+
+          for(int i=0; i< bytesInPrevBuff; i+=2)
+        }
+        
+
+      }
+
+      
       // if(numSamples >80) numSamples = 80; //Just drop samples. If we don't then we just fall behind and drop more.
 
       //If we have a left over sample from last read, we need to increase num samples.
-      if(raw_data_offset == 1){
-        numSamples = numSamples+1; // Add from the last one.
-        raw_data_offset =0; // reset
-      }
-      //We must process chunks that have length that is a multiple of the downsampling factor(2)
-      //If the sample length is odd we just do the first N-1 samples, and add the last sample to the beginning of the next chunk.
-      if(numSamples%2 != 0 ){
-        //Serial.println("Odd numer of samples!");
-        numSamples = numSamples-1; //Only process the first N-1 samples, which is an even chunk.
-        raw_data_offset = 1;  // We want to copy the next chunk starting at index 1 so we dont overwrite the last sample.
-      }
+      // if(raw_data_offset == 1){
+      //   numSamples = numSamples+1; // Add from the last one.
+      //   raw_data_offset =0; // reset
+      // }
+      // //We must process chunks that have length that is a multiple of the downsampling factor(2)
+      // //If the sample length is odd we just do the first N-1 samples, and add the last sample to the beginning of the next chunk.
+      // if(numSamples%2 != 0 ){
+      //   //Serial.println("Odd numer of samples!");
+      //   numSamples = numSamples-1; //Only process the first N-1 samples, which is an even chunk.
+      //   raw_data_offset = 1;  // We want to copy the next chunk starting at index 1 so we dont overwrite the last sample.
+      // }
       
-      //Downsample each signal. Input is the 4kHz data stream, output is half the number of samples, into the output buffer. 
-      downsampler_x.downsample(acc_x,acc_x_2khz,numSamples);
-      downsampler_y.downsample(acc_y,acc_y_2khz,numSamples);
-      downsampler_z.downsample(acc_z,acc_z_2khz,numSamples);
+        // //Downsample each signal. Input is the 4kHz data stream, output is half the number of samples, into the output buffer. 
+        // downsampler_x.downsample(acc_x,acc_x_2khz,numSamples);
+        // downsampler_y.downsample(acc_y,acc_y_2khz,numSamples);
+        // downsampler_z.downsample(acc_z,acc_z_2khz,numSamples);
       
       //Add one to num samples to get the original num samples.
-      if((numSamples+1)%2 != 0 ){
-        acc_x[0] = acc_x[numSamples]; //Copy the sample that was not processed to the begining of the buffer.
-        acc_y[0] = acc_y[numSamples];
-        acc_z[0] = acc_z[numSamples];  
-      }
+      // if((numSamples+1)%2 != 0 ){
+      //   acc_x[0] = acc_x[numSamples]; //Copy the sample that was not processed to the begining of the buffer.
+      //   acc_y[0] = acc_y[numSamples];
+      //   acc_z[0] = acc_z[numSamples];  
+      // }
 
-      numSamples = numSamples/2; // Now we're working with the downsampled data.
-      //Serial.printf("acc_x_2k: %.15f ",acc_x_2khz[20]);
+      // numSamples = numSamples/2; // Now we're working with the downsampled data.
+      // //Serial.printf("acc_x_2k: %.15f ",acc_x_2khz[20]);
 
-      convert_to_int(acc_x_2khz,acc_x_int,numSamples,IMU.getAccelBiasX_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorX());
-      convert_to_int(acc_y_2khz,acc_y_int,numSamples,IMU.getAccelBiasY_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorY());
-      convert_to_int(acc_z_2khz,acc_z_int,numSamples,IMU.getAccelBiasZ_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorZ());
+      // convert_to_int(acc_x_2khz,acc_x_int,numSamples,IMU.getAccelBiasX_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorX());
+      // convert_to_int(acc_y_2khz,acc_y_int,numSamples,IMU.getAccelBiasY_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorY());
+      // convert_to_int(acc_z_2khz,acc_z_int,numSamples,IMU.getAccelBiasZ_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorZ());
 
-      //Serial.printf("acc_x_int: %d",acc_x_int[20]);
+      // //Serial.printf("acc_x_int: %d",acc_x_int[20]);
       
       
       //Pack the data into x,y,z for writing to sd card.
-      int count=0;
-      for(int i=buffer_index; i< buffer_index+numSamples; i++){
-        //Serial.printf("x[%d]: %d\n",i,acc_x_int[i]);
+      // int count=0;
+      // for(int i=sd_; i< sd_+numSamples; i++){
+      //   //Serial.printf("x[%d]: %d\n",i,acc_x_int[i]);
 
-        sdBuffer[i*3] = acc_x_int[count];
-        sdBuffer[(i*3)+1] = acc_y_int[count];
-        sdBuffer[(i*3)+2] = acc_z_int[count];
-        count++;
-      }
+      //   sdBuffer[i*3] = acc_x_int[count];
+      //   sdBuffer[(i*3)+1] = acc_y_int[count];
+      //   sdBuffer[(i*3)+2] = acc_z_int[count];
+      //   count++;
+      // }
       // long start = millis();
       // //Send the data to the Gateway. numSamples will always be between 40 and 42, inclusive. 
       // if(numSamples>40){
@@ -263,42 +284,39 @@ if(mode == LOGGING){
       // long start = millis();
       // BLE_Stack.sendData(sdBuffer,40*6);
       // Serial.printf("time ble: %d\n",millis()-start);
-      //   BLE_Stack.sendData(&sdBuffer[buffer_index],40*6);//Send up to 40 samples in one packet.
+      //   BLE_Stack.sendData(&sdBuffer[sd_],40*6);//Send up to 40 samples in one packet.
       //   uint8_t overflow = numSamples-40; //Number of extra samples to deal with.
-      //   BLE_Stack.sendData(&sdBuffer[buffer_index+(40*6)], overflow*6);
+      //   BLE_Stack.sendData(&sdBuffer[sd_+(40*6)], overflow*6);
       // }
       // else{
       //   //There is exactly 40 samples, send in one go.
-      //   BLE_Stack.sendData(&sdBuffer[buffer_index], 40*6);
+      //   BLE_Stack.sendData(&sdBuffer[sd_], 40*6);
       // }
       // Serial.printf("BT send time: %d",millis()-start);
-      buffer_index += numSamples; 
-      Serial.printf("buff idx: %d, fifoSize: %d, offset:%d \n\r",buffer_index,numSamples,raw_data_offset);
+      sd_ += numSamples; 
+      Serial.printf("buff idx: %d, fifoSize: %d, offset:%d \n\r",sd_,numSamples,raw_data_offset);
       Serial.flush();
+      digitalWrite(PIN_A0,LOW);
 
       //Serial.flush();
     }
 
-    if(buffer_index>73){
-
-
-      //Serial.flush();
-      
+    if(sd_>73){
 
       Serial.println("Writing to sd");
       Serial.flush();
-      file.write(sdBuffer,buffer_index*6);
+      file.write(sdBuffer,sd_*6);
       //file.sync(); // Sounds like this is needed? NO!
 
-      buffer_index = 0;
+      sd_ = 0;
     }
 
     if(digitalRead(BUTTON_PIN) == LOW ){
 
       Serial.println("End of test...");
       file.close();
-      // IMU_SPI.pauseRecurringTransfers();
-      // IMU.haltSampleAccumulation();
+      IMU_SPI.pauseRecurringTransfers();
+      IMU.haltSampleAccumulation();
       Serial.flush();
       while(1){};
     }
@@ -318,6 +336,19 @@ void  convert_to_int(float* in, int16_t* out, int num_samples, float bias, float
    
     }
 
+}
+
+void mergeSampleStreams(uint8_t* outBuff, int16_t* in1, int16_t* in2, int16_t* in3, uint16_t numSamples){
+
+    uint16_t count = 0;
+    for(int i=0; i<numSamples; i++){
+  
+      outBuff[i*3] = in1[count];
+      outBuff[(i*3)+1] = in2[count];
+      outBuff[(i*3)+2] = in3[count];
+      count++;
+
+    }
 }
 
 void test_downsampling(){

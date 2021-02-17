@@ -8,10 +8,10 @@
 #include "nrfx_ppi.h"
 #include "nrfx_gpiote.h"
 
-#define SPI_NUM_BLOCKS  81 //Fifo holds 85 samples, and the fifo size takes 1 more block.
+#define SPI_NUM_BLOCKS  80 //Fifo holds 85 samples, and the fifo size takes 1 more block.
 #define SPI_BYTES_PER_BLOCK 7   //Each "block" transfers one sample, which is 6 bytes, plus the command.
 #define SPI_BLOCK_DELAY_MS  15  //Fifo takes 21ms to fill, so 20ms is conservative.
-#define SPI_NUM_FIFO        3   //How many FIFOs we can read before we need CPU intervention.
+#define SPI_NUM_FIFO        5   //How many FIFOs we can read before we need CPU intervention.
 
 typedef struct {
 
@@ -58,7 +58,8 @@ public:
     uint32_t getTimeUntilTransfer();
 
     //Copies the rx buffer to a user buffer, starting at "index", and copying "numCopy" fifos worth of data.
-void getRxData(uint8_t* buff, uint8_t index,uint8_t numCopy);
+    //Also resets the spi dma buffers, so we can again have a delay without losing samples.
+    void getRxData(uint8_t* buff, uint8_t index,uint8_t numCopy);
 
 private:
     uint8_t _uc_pinSS;
@@ -91,6 +92,9 @@ private:
     void setup_sample_counter(uint8_t numSamples);
     void setup_tracking_counter();
     void setup_pinChange_event();
+
+    //Enable or disable PPI channels. true-> enable, false->disable.
+    void enablePPI(bool enable);
 
     //Handler called from the "event done" interrupt. Basically called when a transfer is complete.
     static void spi_handler(nrfx_spim_evt_t const * p_event,void *p_context);
