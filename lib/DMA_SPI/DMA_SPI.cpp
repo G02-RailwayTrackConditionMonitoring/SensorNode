@@ -164,7 +164,7 @@ void DMA_SPI::setup_recurring_timer(uint8_t delay_ms){
    //Setup the compare channel. This will cause an event when the counter gets to the specified value.
   //Right now we are using channel 0 (arbritrary), short circuit the compare to the clear so we automatically restart the counter, interrupt disabled.
   //Add one since it seems to do one less transfer, except on the first time, so we increment manually by 1 to account for the first time.
-  nrfx_timer_extended_compare(&tim1, NRF_TIMER_CC_CHANNEL0,num_transfer+1,NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK,true);
+  nrfx_timer_extended_compare(&tim1, NRF_TIMER_CC_CHANNEL0,num_transfer+1,NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK,false);
   
 
   tim1.p_reg->EVENTS_COMPARE[0] = 0x1; //Should enable event generation for CC channel 0.
@@ -186,17 +186,17 @@ void DMA_SPI::setup_sample_counter(uint8_t numSamples){
   cfg.p_context = this;
 
   //First we initialize a timer which will initiate the bulk transfers.
-  nrfx_err_t err = nrfx_timer_init(&tim3,&cfg,tim1_handler);
+  nrfx_err_t err = nrfx_timer_init(&tim3,&cfg,tim3_handler);
   Serial.printf("Sample Counter setup error: %x\n\r",err);
   Serial.flush();
 
    //Setup the compare channel. This will cause an event when the counter gets to the specified value.
   //Right now we are using channel 0 (arbritrary), short circuit the compare to the clear so we automatically restart the counter, interrupt disabled.
   //Add one since it seems to do one less transfer, except on the first time, so we increment manually by 1 to account for the first time.
-  nrfx_timer_extended_compare(&tim3, NRF_TIMER_CC_CHANNEL0,numSamples,NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK,true);
+  nrfx_timer_extended_compare(&tim3, NRF_TIMER_CC_CHANNEL0,numSamples,NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK,false);
   
 
-  tim1.p_reg->EVENTS_COMPARE[0] = 0x1; //Should enable event generation for CC channel 0.
+  tim3.p_reg->EVENTS_COMPARE[0] = 0x1; //Should enable event generation for CC channel 0.
 
 }
 
@@ -221,6 +221,30 @@ void DMA_SPI::setup_tracking_counter(){
 
 }
 
+void DMA_SPI::setup_pinChange_event(){
+
+  // //Setup a pin config for a rising edge detection, high-acc = true
+  nrfx_gpiote_in_config_t pinConfig = NRFX_GPIOTE_CONFIG_IN_SENSE_LOTOHI(true);
+  nrfx_err_t res;
+  if(!nrfx_gpiote_is_init()){
+    //If not already configured, initialize module.
+    res = nrfx_gpiote_init(NRFX_GPIOTE_DEFAULT_CONFIG_IRQ_PRIORITY);
+    Serial.printf("gpiote init err: %x\n\r",res);
+  }
+
+// NRF_GPIOTE->CONFIG[0] = GPIOTE_CONFIG_MODE_Event << GPIOTE_CONFIG_MODE_Pos | 
+//                                          GPIOTE_CONFIG_POLARITY_LoToHi << GPIOTE_CONFIG_POLARITY_Pos | 
+//                                          11 << GPIOTE_CONFIG_PSEL_Pos | 
+//                                          GPIOTE_CONFIG_OUTINIT_High << GPIOTE_CONFIG_OUTINIT_Pos;    // ignored when gpio is set to event mode
+                                         
+
+  //pin 11 corresponds to D12
+  res = nrfx_gpiote_in_init(11,&pinConfig,gpiote_handler);
+  Serial.printf("gpiote pin config: %x\n\r",res);
+  nrfx_gpiote_in_event_enable(11, false);
+
+}
+
 void DMA_SPI::setupReccuringTransfer(){
 
   // digitalToggle(PIN_A0);
@@ -231,7 +255,7 @@ void DMA_SPI::setupReccuringTransfer(){
   setup_pinChange_event();
 
   //setup up the counter to track how many samples are in the fifo.
-  setup_sample_counter(numBlocks);
+  setup_sample_counter(numBlocks-1);
 
   //Setup the counter for controlling the number of transfers per period.
   setup_recurring_counter(numBlocks);
@@ -251,13 +275,13 @@ void DMA_SPI::setupReccuringTransfer(){
   err = nrfx_ppi_channel_alloc(&gpioteToCounter_PPI_CHAN);
   Serial.printf("PPI channe err: %x\n\r",err);
   err = nrfx_ppi_channel_alloc(&SpiToCounter_PPI_CHAN);
-  // Serial.printf("PPI channe err: %x\n",err);
+  Serial.printf("PPI channe err: %x\n",err);
   err = nrfx_ppi_channel_alloc(&CounterToSpi_PPI_CHAN);
-  // Serial.printf("PPI channe err: %x\n",err);
+  Serial.printf("PPI channe err: %x\n",err);
   err = nrfx_ppi_channel_alloc(&spiToSpi_PPI_CHAN);
-  // Serial.printf("spi->spi PPI channel err: %x\n",err);
+  Serial.printf("spi->spi PPI channel err: %x\n",err);
   err = nrfx_ppi_group_alloc(&ppiGroup);
-  // Serial.printf("group alloc err: %x\n",err);
+  Serial.printf("group alloc err: %x\n",err);
 
   //Assign the ppi channel routing.
 
@@ -267,38 +291,38 @@ void DMA_SPI::setupReccuringTransfer(){
   err = nrfx_ppi_channel_assign(timerToSpi_PPI_CHAN,nrf_timer_event_address_get(tim3.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_START));
    Serial.printf("PPI assign counter to spi: %x\n\r",err);
     //err = nrfx_ppi_channel_assign(timerToCounter_PPI_CHAN,nrf_timer_event_address_get(tim1.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_timer_task_address_get(tim2.p_reg,NRF_TIMER_TASK_COUNT));
-  // Serial.printf("PPI assign timer to counter: %x\n\r",err);
+  Serial.printf("PPI assign timer to counter: %x\n\r",err);
   err = nrfx_ppi_channel_assign(SpiToCounter_PPI_CHAN,nrf_spim_event_address_get(_spim.p_reg,NRF_SPIM_EVENT_END),nrf_timer_task_address_get(tim1.p_reg,NRF_TIMER_TASK_COUNT));
-  // Serial.printf("PPI assign spi to counter: %x\n\r",err);
+  Serial.printf("PPI assign spi to counter: %x\n\r",err);
   err = nrfx_ppi_channel_assign(CounterToSpi_PPI_CHAN,nrf_timer_event_address_get(tim1.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_STOP));
-  // Serial.printf("PPI assign counter to spi: %x\n\r",err);
+  Serial.printf("PPI assign counter to spi: %x\n\r",err);
   err = nrfx_ppi_channel_assign(spiToSpi_PPI_CHAN,nrf_spim_event_address_get(_spim.p_reg,NRF_SPIM_EVENT_END),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_START));
-  // Serial.printf("PPI assign spi to spi: %x\n\r",err);
+  Serial.printf("PPI assign spi to spi: %x\n\r",err);
 
   //Assign the spi->spi to a group so we can enable/disable it.
   err = nrfx_ppi_channel_include_in_group(spiToSpi_PPI_CHAN,ppiGroup);
-  // Serial.printf("PPI assign chan to group err: %x\n\r",err);
+  Serial.printf("PPI assign chan to group err: %x\n\r",err);
 
   //Set forks for starting/stopping the spi channel.
   err = nrfx_ppi_channel_fork_assign(timerToSpi_PPI_CHAN,nrfx_ppi_task_addr_group_enable_get(ppiGroup));
-  // Serial.printf("PPI assign fork to enable group: %x\n\r",err);
+  Serial.printf("PPI assign fork to enable group: %x\n\r",err);
   err = nrfx_ppi_channel_fork_assign(CounterToSpi_PPI_CHAN,nrfx_ppi_task_addr_group_disable_get(ppiGroup));
-  // Serial.printf("PPI assign fork to disable group: %x\n\r",err);
+  Serial.printf("PPI assign fork to disable group: %x\n\r",err);
   err = nrfx_ppi_channel_fork_assign(SpiToCounter_PPI_CHAN,nrf_timer_task_address_get(tim2.p_reg,NRF_TIMER_TASK_COUNT));
-  // Serial.printf("PPI assign fork to trackign counter: %x\n\r",err);
+  Serial.printf("PPI assign fork to trackign counter: %x\n\r",err);
 
 
   //Enable the PPI channels
   err = nrfx_ppi_channel_enable(timerToSpi_PPI_CHAN);
-  // Serial.printf("PPI enable timer to spi: %x\n\r",err);
+  Serial.printf("PPI enable timer to spi: %x\n\r",err);
   err = nrfx_ppi_channel_enable(gpioteToCounter_PPI_CHAN);
-  // Serial.printf("PPI enable timer to counter: %x\n\r",err);
+  Serial.printf("PPI enable timer to counter: %x\n\r",err);
   err = nrfx_ppi_channel_enable(SpiToCounter_PPI_CHAN);
-  // Serial.printf("PPI enable spi to counter: %x\n\r",err);
+  Serial.printf("PPI enable spi to counter: %x\n\r",err);
   err = nrfx_ppi_channel_enable(CounterToSpi_PPI_CHAN);
-  // Serial.printf("PPI enable counter to spi: %x\n\r",err);
+  Serial.printf("PPI enable counter to spi: %x\n\r",err);
   err = nrfx_ppi_channel_enable(spiToSpi_PPI_CHAN);
-  // Serial.printf("PPI enable spi to spi: %x\n\r",err);  
+  Serial.printf("PPI enable spi to spi: %x\n\r",err);  
 
   // Have the end of one transmission start the next.
   //Apparently the STOP is ignored if shorts are enabled :(
@@ -314,13 +338,13 @@ void DMA_SPI::setupReccuringTransfer(){
   //Setup the tx buffer.
   for(int i=0; i<SPI_NUM_BLOCKS;i++){
 
-    // //For the first transfer we want to read the fifo size.
-    // if(i==0){
-    //   tx_buffer[i].buffer[0] = 0x72|0x80; //Read Fifo count | SPI_READ.
-    // }
-    // else{
+    //For the first transfer we want to read the fifo size.
+    if(i==0){
+      tx_buffer[i].buffer[0] = 0x72|0x80; //Read Fifo count | SPI_READ.
+    }
+    else{
       tx_buffer[i].buffer[0] = 0x74|0x80; //Read the fifo data.
-    // }
+    }
     // tx_buffer[i].buffer[0] = i;
   
   }
@@ -357,7 +381,7 @@ void DMA_SPI::startRecuringTransfers(){
   // Serial.flush();
 
   //Start the timer.
- // nrfx_timer_enable(&tim0);
+ nrfx_timer_enable(&tim3);
 
   // Serial.println("set tim0...");
   // Serial.flush();
@@ -379,7 +403,7 @@ void DMA_SPI::startRecuringTransfers(){
 void DMA_SPI::pauseRecurringTransfers(){
 
   //Start the timer.
-  //nrfx_timer_disable(&tim0);
+  nrfx_timer_disable(&tim3);
 
   //Start the counter.
   nrfx_timer_disable(&tim1);
@@ -401,6 +425,13 @@ void DMA_SPI::tim1_handler(nrf_timer_event_t event_type, void* p_context){
 
   
   digitalToggle(PIN_A1);
+  //Not really needed for the application but useful for debugging. 
+}
+
+void DMA_SPI::tim3_handler(nrf_timer_event_t event_type, void* p_context){
+
+  
+  digitalToggle(PIN_A0);
   //Not really needed for the application but useful for debugging. 
 }
 
@@ -434,29 +465,7 @@ uint32_t DMA_SPI::getTimeUntilTransfer(){
   }
 }
 
-void DMA_SPI::setup_pinChange_event(){
 
-  // //Setup a pin config for a rising edge detection, high-acc = true
-  nrfx_gpiote_in_config_t pinConfig = NRFX_GPIOTE_CONFIG_IN_SENSE_LOTOHI(true);
-  nrfx_err_t res;
-  if(!nrfx_gpiote_is_init()){
-    //If not already configured, initialize module.
-    res = nrfx_gpiote_init(NRFX_GPIOTE_DEFAULT_CONFIG_IRQ_PRIORITY);
-    Serial.printf("gpiote init err: %x\n\r",res);
-  }
-
-// NRF_GPIOTE->CONFIG[0] = GPIOTE_CONFIG_MODE_Event << GPIOTE_CONFIG_MODE_Pos | 
-//                                          GPIOTE_CONFIG_POLARITY_LoToHi << GPIOTE_CONFIG_POLARITY_Pos | 
-//                                          11 << GPIOTE_CONFIG_PSEL_Pos | 
-//                                          GPIOTE_CONFIG_OUTINIT_High << GPIOTE_CONFIG_OUTINIT_Pos;    // ignored when gpio is set to event mode
-                                         
-
-  //pin 11 corresponds to D12
-  res = nrfx_gpiote_in_init(11,&pinConfig,gpiote_handler);
-  Serial.printf("gpiote pin config: %x\n\r",res);
-  nrfx_gpiote_in_event_enable(11, true);
-
-}
 
 void DMA_SPI::getRxData(uint8_t* buff, uint8_t index,uint8_t numCopy){
 

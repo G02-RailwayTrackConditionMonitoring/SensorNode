@@ -173,9 +173,9 @@ if(mode == LOGGING){
       // IMU.readFifo(&acc_x[raw_data_offset],&acc_y[raw_data_offset],&acc_z[raw_data_offset],&nm_smp); // read the fifo buffer from the IMU
       Serial.printf("reading imu:");
       Serial.flush();
-      digitalWrite(PIN_A0,HIGH);
+      digitalWrite(PIN_A1,HIGH);
       IMU_SPI.getRxData(imu_buffer,imu_rx_buff_index,0);
-      digitalWrite(PIN_A0,LOW);
+      digitalWrite(PIN_A1,LOW);
 
       // numSamples = (((uint16_t) (imu_buffer[1]&0x0F)) << 8) + (((uint16_t) imu_buffer[2]));
       // if(numSamples%6 != 0){
