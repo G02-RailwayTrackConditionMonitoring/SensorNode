@@ -314,18 +314,10 @@ void DMA_SPI::setupReccuringTransfer(){
 
 
 
-  //Setup the tx buffer.
+  //Setup the tx buffer. Puts the "read fifo" command as the first byte of each transaction.
   for(int i=0; i<SPI_NUM_BLOCKS;i++){
 
-    //For the first transfer we want to read the fifo size.
-    // if(i==0){
-    //   tx_buffer[i].buffer[0] = 0x72|0x80; //Read Fifo count | SPI_READ.
-    // }
-    // else{
       tx_buffer[i].buffer[0] = 0x74|0x80; //Read the fifo data.
-    // }
-    // tx_buffer[i].buffer[0] = i;
-  
   }
 
   //Copy for the remaining fifo buffers worth of tx buffer.
@@ -334,11 +326,6 @@ void DMA_SPI::setupReccuringTransfer(){
 
     memcpy(&tx_buffer[(SPI_NUM_BLOCKS*(i+1))+(i+1)],&tx_buffer,SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
   }
-  // memcpy(&tx_buffer[SPI_NUM_BLOCKS+1],&tx_buffer,SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
-  // memcpy(&tx_buffer[SPI_NUM_BLOCKS*2+2],&tx_buffer,SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
-  //memcpy(&tx_buffer[SPI_NUM_BLOCKS*3+3],&tx_buffer,SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
-  //MAKE THIS AUTOMATIC!!!!! -> Done
-
 
   // //For debugging purpose, print the tx buff. Comment out later!
   // for(int i=0; i < SPI_NUM_BLOCKS*2;i++){
@@ -512,8 +499,6 @@ void DMA_SPI::getRxData(uint8_t* buff, uint8_t index,uint8_t numCopy){
 
   //     Serial.println(" ");
   // }
-
-
 
 }
 

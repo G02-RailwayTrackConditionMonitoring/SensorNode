@@ -74,7 +74,7 @@ private:
     ArrayList_t rx_buffer[SPI_NUM_BLOCKS*SPI_NUM_FIFO+(SPI_NUM_FIFO-1)*1]; 
     ArrayList_t tx_buffer[SPI_NUM_BLOCKS*SPI_NUM_FIFO+(SPI_NUM_FIFO-1)*1];
 
-    nrfx_timer_t tim0; //Used as a timer to initiate recurring block transfer.
+    nrfx_timer_t tim0; //Used as a timer to initiate recurring block transfer.NOT USED ANYMORE.
     nrfx_timer_t tim3; //Used to count the "sample ready" interrupts.
     nrfx_timer_t tim1; //Used as a couter for counting number of bytes transfered in each recurring block transfer.
     nrfx_timer_t tim2; //Used to count how many fifo reads we have done, so we know if there is data to transfer and reset buffers.
