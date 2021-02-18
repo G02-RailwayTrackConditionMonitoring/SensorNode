@@ -69,7 +69,7 @@ int16_t acc_y_int[SPI_NUM_BLOCKS/2];
 int16_t acc_z_int[SPI_NUM_BLOCKS/2];
 
 //Holds the packed data (x,y,z).
-uint8_t mergedData[SPI_NUM_BLOCKS*6]; 
+uint8_t mergedData[SPI_NUM_BLOCKS/2*6]; 
 
 typedef enum{
   BUFF_A,
@@ -116,20 +116,20 @@ void setup() {
   pinMode(LED_BLUE,OUTPUT);
   pinMode(BUTTON_PIN,INPUT_PULLUP);
 
-  // Serial.println("Starting BLE...");
+  Serial.println("Starting BLE...");
 
-  // #ifdef NODE_1
-  // BLE_Stack.startBLE("G02_A");
-  // #elif NODE_2
-  // BLE_Stack.startBLE("G02_B");
-  // #endif
+  #ifdef NODE_1
+  BLE_Stack.startBLE("G02_A");
+  #elif NODE_2
+  BLE_Stack.startBLE("G02_B");
+  #endif
   
-  // while(!BLE_Stack.isConnected()){
-  //   BLE_Stack.startAdvertising();
-  //   Serial.println("Connecting to BLE.");
-  //   delay(5000);
-  // } // Wait to be connected.
-  // delay(10000);//Wait for connectino to be good.
+  while(!BLE_Stack.isConnected()){
+    BLE_Stack.startAdvertising();
+    Serial.println("Connecting to BLE.");
+    delay(5000);
+  } // Wait to be connected.
+  delay(10000);//Wait for connectino to be good.
   //Setup SD card with cs pin 2, max Freq 10MHz.
   if(!sd.begin(SdSpiConfig(SD_CS_PIN, SHARED_SPI, SPI_CLOCK))){
     Serial.println("Error initializing SD card...");
@@ -177,7 +177,7 @@ if(mode == LOGGING){
     //Check if we have any frames available
     if((imu_num_frames = IMU_SPI.getRxBuffIndex())){
 
-      digitalWrite(PIN_A0,HIGH);
+      // digitalWrite(PIN_A0,HIGH);
       Serial.printf("reading imu:");
       Serial.flush();
       
@@ -199,32 +199,34 @@ if(mode == LOGGING){
 
         numSamples = numSamples/2; // Now we're working with the downsampled data.
         // Serial.printf("down x0:%f y0:%f z0:%f\r\n",acc_x_2khz[0],acc_y_2khz[0],acc_z_2khz[0]);
+
         //Convert our samples back to integer values. This is done since int16 is half the space of float32.
         convert_to_int(acc_x_2khz,acc_x_int,numSamples,IMU.getAccelBiasX_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorX());
         convert_to_int(acc_y_2khz,acc_y_int,numSamples,IMU.getAccelBiasY_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorY());
         convert_to_int(acc_z_2khz,acc_z_int,numSamples,IMU.getAccelBiasZ_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorZ());
-        Serial.printf("int x0:%d y0:%d z0:%d\r\n",acc_x_int[0],acc_y_int[0],acc_z_int[0]);
+        // Serial.printf("int x0:%d y0:%d z0:%d\r\n",acc_x_int[0],acc_y_int[0],acc_z_int[0]);
+
         //Pack the data into x,y,z for writing to sd card.
         mergeSampleStreams(mergedData, acc_x_int, acc_y_int, acc_z_int,numSamples);
-        Serial.printf("merged %x %x %x %x %x %x\r\n",mergedData[0],mergedData[1],mergedData[2],mergedData[3],mergedData[4],mergedData[5]);
+        // Serial.printf("merged %x %x %x %x %x %x\r\n",mergedData[0],mergedData[1],mergedData[2],mergedData[3],mergedData[4],mergedData[5]);
 
         //Now put  data into sd buffer and save to card if full.
         //We can fit all the samples in the current buffer.
         Serial.printf("sd indx:%d\r\n",sdBuff_idx);
         if(numSamples*6 + sdBuff_idx<SD_BUFFER_SIZE){
-          Serial.println("single buff");
+          // Serial.println("single buff");
           if(sdBuff_selection == BUFF_A){
             memcpy(&sdBufferA[sdBuff_idx],&mergedData[0],numSamples*6);
           }
           else if(sdBuff_selection == BUFF_B){
             memcpy(&sdBufferB[sdBuff_idx],&mergedData[0],numSamples*6);
           }
-          Serial.printf("A %x %x %x %x %x %x\r\n",sdBufferA[sdBuff_idx+0],sdBufferA[sdBuff_idx+1],sdBufferA[sdBuff_idx+2],sdBufferA[sdBuff_idx+3],sdBufferA[sdBuff_idx+4],sdBufferA[sdBuff_idx+5]);
-          Serial.printf("B %x %x %x %x %x %x\r\n",sdBufferB[sdBuff_idx+0],sdBufferB[sdBuff_idx+1],sdBufferB[sdBuff_idx+2],sdBufferB[sdBuff_idx+3],sdBufferB[sdBuff_idx+4],sdBufferB[sdBuff_idx+5]);
+          // Serial.printf("A %x %x %x %x %x %x\r\n",sdBufferA[sdBuff_idx+0],sdBufferA[sdBuff_idx+1],sdBufferA[sdBuff_idx+2],sdBufferA[sdBuff_idx+3],sdBufferA[sdBuff_idx+4],sdBufferA[sdBuff_idx+5]);
+          // Serial.printf("B %x %x %x %x %x %x\r\n",sdBufferB[sdBuff_idx+0],sdBufferB[sdBuff_idx+1],sdBufferB[sdBuff_idx+2],sdBufferB[sdBuff_idx+3],sdBufferB[sdBuff_idx+4],sdBufferB[sdBuff_idx+5]);
           sdBuff_idx += (numSamples*6);
         }
         else{
-          Serial.println("cross buff");
+          // Serial.println("cross buff");
           //We split the 40 samples across the buffers.
           uint16_t bytesInPrevBuff = SD_BUFFER_SIZE - sdBuff_idx;
           uint16_t bytesLeft = (numSamples*6) - bytesInPrevBuff;
@@ -259,6 +261,9 @@ if(mode == LOGGING){
 
         }
         
+        //Send data over BLE.
+        BLE_Stack.sendData(mergedData,numSamples*6);
+
         Serial.flush();
       }
 
@@ -329,7 +334,7 @@ if(mode == LOGGING){
       // sd_ += numSamples; 
       // Serial.printf("buff idx: %d, fifoSize: %d, offset:%d \n\r",sd_,numSamples,raw_data_offset);
       // Serial.flush();
-      digitalWrite(PIN_A0,LOW);
+      // digitalWrite(PIN_A0,LOW);
 
       //Serial.flush();
     }
