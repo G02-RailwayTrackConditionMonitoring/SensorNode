@@ -4,6 +4,8 @@ This repository contains the software running on the sensor nodes.
 
 The project is setup for PlatfomIO, and targets the NRF52840.
 
+Comment out line 27 (#define USE_BLE) to disable BLE for testing.
+
 ## Dependancies
 
 A custom wrapper for the Adafruit BLE library is used.
@@ -15,7 +17,6 @@ Seems to be working at 8MHz SPI read speeds, hardware should support up to 20MHz
 More info in lib/Bolder Flight Systems MPU9250/README.
 
 The  SDFat library is used for interfacing with the SD card.
-__This is included as a git submodule__.
 More info in lib/SDFat/README.
 
 The CMSIS-DSP library is used for downsampling.
@@ -23,7 +24,6 @@ More info in lib/cmisis-dsp.
 
 ## Building the Project
 
-When you clone the repository, use the command "git clone --recurse-submodules {url}" to also get the submodules (SDFat).
 
 This project is meant to be deployed on mulitple sensor node devices each with a unique name and identifiers.
 
