@@ -5,6 +5,7 @@
 #include "nrfx_timer.h"
 #include "hal/nrf_timer.h"
 #include "nrfx_ppi.h"
+#include "nrfx_gpiote.h"
 
 void DMA_SPI::begin(){
 
@@ -107,6 +108,8 @@ void DMA_SPI::setClock(uint8_t freq_MHz){
             break;
     case 8: clockFreq = NRF_SPIM_FREQ_8M;
             break;
+    case 16: clockFreq = NRF_SPIM_FREQ_16M;
+            break;
     default:clockFreq = NRF_SPIM_FREQ_1M;
             break;
   }
@@ -161,10 +164,39 @@ void DMA_SPI::setup_recurring_timer(uint8_t delay_ms){
    //Setup the compare channel. This will cause an event when the counter gets to the specified value.
   //Right now we are using channel 0 (arbritrary), short circuit the compare to the clear so we automatically restart the counter, interrupt disabled.
   //Add one since it seems to do one less transfer, except on the first time, so we increment manually by 1 to account for the first time.
-  nrfx_timer_extended_compare(&tim1, NRF_TIMER_CC_CHANNEL0,num_transfer+1,NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK,true);
+  nrfx_timer_extended_compare(&tim1, NRF_TIMER_CC_CHANNEL0,num_transfer+1,NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK,false);
   
 
   tim1.p_reg->EVENTS_COMPARE[0] = 0x1; //Should enable event generation for CC channel 0.
+
+}
+
+void DMA_SPI::setup_sample_counter(uint8_t numSamples){
+
+  //Boilerplate stuff, just assigning the TIMER0 struct.
+  tim3.cc_channel_count = TIMER3_CC_NUM;
+  tim3.instance_id = NRFX_TIMER3_INST_IDX;
+  tim3.p_reg = NRF_TIMER3;
+  
+  //Configure the timer , 16bit, 16Mhz clock, counter.
+  nrfx_timer_config_t cfg;
+  cfg.frequency = NRF_TIMER_FREQ_16MHz;
+  cfg.mode = NRF_TIMER_MODE_COUNTER;
+  cfg.bit_width = NRF_TIMER_BIT_WIDTH_16; //Apparently timer 1 and 2 don't support 32 bit mode!
+  cfg.p_context = this;
+
+  //First we initialize a timer which will initiate the bulk transfers.
+  nrfx_err_t err = nrfx_timer_init(&tim3,&cfg,tim3_handler);
+  Serial.printf("Sample Counter setup error: %x\n\r",err);
+  Serial.flush();
+
+   //Setup the compare channel. This will cause an event when the counter gets to the specified value.
+  //Right now we are using channel 0 (arbritrary), short circuit the compare to the clear so we automatically restart the counter, interrupt disabled.
+  //Add one since it seems to do one less transfer, except on the first time, so we increment manually by 1 to account for the first time.
+  nrfx_timer_extended_compare(&tim3, NRF_TIMER_CC_CHANNEL0,numSamples,NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK,false);
+  
+
+  tim3.p_reg->EVENTS_COMPARE[0] = 0x1; //Should enable event generation for CC channel 0.
 
 }
 
@@ -189,13 +221,35 @@ void DMA_SPI::setup_tracking_counter(){
 
 }
 
+void DMA_SPI::setup_pinChange_event(){
+
+  // //Setup a pin config for a rising edge detection, high-acc = true
+  nrfx_gpiote_in_config_t pinConfig = NRFX_GPIOTE_CONFIG_IN_SENSE_LOTOHI(true);
+  nrfx_err_t res;
+  if(!nrfx_gpiote_is_init()){
+    //If not already configured, initialize module.
+    res = nrfx_gpiote_init(NRFX_GPIOTE_DEFAULT_CONFIG_IRQ_PRIORITY);
+    Serial.printf("gpiote init err: %x\n\r",res);
+  }                                
+
+  //pin 11 corresponds to D12
+  res = nrfx_gpiote_in_init(11,&pinConfig,gpiote_handler);
+  Serial.printf("gpiote pin config: %x\n\r",res);
+  nrfx_gpiote_in_event_enable(11, false);
+
+}
+
 void DMA_SPI::setupReccuringTransfer(){
 
   // digitalToggle(PIN_A0);
   Serial.println("Setting up block transfers...");
   Serial.flush();
   //Setup the timer that controls how often the block transfers happen.
-  setup_recurring_timer(blockDelay_ms);
+  //setup_recurring_timer(blockDelay_ms);
+  setup_pinChange_event();
+
+  //setup up the counter to track how many samples are in the fifo.
+  setup_sample_counter(numBlocks);
 
   //Setup the counter for controlling the number of transfers per period.
   setup_recurring_counter(numBlocks);
@@ -211,9 +265,9 @@ void DMA_SPI::setupReccuringTransfer(){
 
   //Allocate the PPI channels.
   nrfx_err_t err = nrfx_ppi_channel_alloc(&timerToSpi_PPI_CHAN);
-  // Serial.printf("PPI channe err: %x\n",err);
-  // err = nrfx_ppi_channel_alloc(&timerToCounter_PPI_CHAN);
-  //Serial.printf("PPI channe err: %x\n\r",err);
+  //  Serial.printf("PPI channe err: %x\n",err);
+  err = nrfx_ppi_channel_alloc(&gpioteToCounter_PPI_CHAN);
+  // Serial.printf("PPI channe err: %x\n\r",err);
   err = nrfx_ppi_channel_alloc(&SpiToCounter_PPI_CHAN);
   // Serial.printf("PPI channe err: %x\n",err);
   err = nrfx_ppi_channel_alloc(&CounterToSpi_PPI_CHAN);
@@ -224,8 +278,12 @@ void DMA_SPI::setupReccuringTransfer(){
   // Serial.printf("group alloc err: %x\n",err);
 
   //Assign the ppi channel routing.
-  err = nrfx_ppi_channel_assign(timerToSpi_PPI_CHAN,nrf_timer_event_address_get(tim0.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_START));
-  // Serial.printf("PPI assign timer to spi: %x\n\r",err);
+
+  err = nrfx_ppi_channel_assign(gpioteToCounter_PPI_CHAN,nrfx_gpiote_in_event_addr_get(11),nrf_timer_task_address_get(tim3.p_reg,NRF_TIMER_TASK_COUNT));
+  //  Serial.printf("PPI assign gpiote to counter: %x\n\r",err);
+  //err = nrfx_ppi_channel_assign(timerToSpi_PPI_CHAN,nrf_timer_event_address_get(tim0.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_START));
+  err = nrfx_ppi_channel_assign(timerToSpi_PPI_CHAN,nrf_timer_event_address_get(tim3.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_spim_task_address_get(_spim.p_reg,NRF_SPIM_TASK_START));
+  // Serial.printf("PPI assign counter to spi: %x\n\r",err);
     //err = nrfx_ppi_channel_assign(timerToCounter_PPI_CHAN,nrf_timer_event_address_get(tim1.p_reg,NRF_TIMER_EVENT_COMPARE0),nrf_timer_task_address_get(tim2.p_reg,NRF_TIMER_TASK_COUNT));
   // Serial.printf("PPI assign timer to counter: %x\n\r",err);
   err = nrfx_ppi_channel_assign(SpiToCounter_PPI_CHAN,nrf_spim_event_address_get(_spim.p_reg,NRF_SPIM_EVENT_END),nrf_timer_task_address_get(tim1.p_reg,NRF_TIMER_TASK_COUNT));
@@ -247,50 +305,27 @@ void DMA_SPI::setupReccuringTransfer(){
   err = nrfx_ppi_channel_fork_assign(SpiToCounter_PPI_CHAN,nrf_timer_task_address_get(tim2.p_reg,NRF_TIMER_TASK_COUNT));
   // Serial.printf("PPI assign fork to trackign counter: %x\n\r",err);
 
+ 
 
-  //Enable the PPI channels
-  err = nrfx_ppi_channel_enable(timerToSpi_PPI_CHAN);
-  // Serial.printf("PPI enable timer to spi: %x\n\r",err);
-  //err = nrfx_ppi_channel_enable(timerToCounter_PPI_CHAN);
-  // Serial.printf("PPI enable timer to counter: %x\n\r",err);
-  err = nrfx_ppi_channel_enable(SpiToCounter_PPI_CHAN);
-  // Serial.printf("PPI enable spi to counter: %x\n\r",err);
-  err = nrfx_ppi_channel_enable(CounterToSpi_PPI_CHAN);
-  // Serial.printf("PPI enable counter to spi: %x\n\r",err);
-  err = nrfx_ppi_channel_enable(spiToSpi_PPI_CHAN);
-  // Serial.printf("PPI enable spi to spi: %x\n\r",err);  
 
   // Have the end of one transmission start the next.
   //Apparently the STOP is ignored if shorts are enabled :(
   //nrf_spim_shorts_enable(_spim.p_reg, NRF_SPIM_SHORT_END_START_MASK);
 
-  //Enable the array list feature of SPI DMA.
-  nrf_spim_rx_list_enable(_spim.p_reg);
-  nrf_spim_tx_list_enable(_spim.p_reg);
 
-  //Use 8MHz SPI clock speed.
-  setClock(8);
 
-  //Setup the tx buffer.
+  //Setup the tx buffer. Puts the "read fifo" command as the first byte of each transaction.
   for(int i=0; i<SPI_NUM_BLOCKS;i++){
 
-    //For the first transfer we want to read the fifo size.
-    if(i==0){
-      tx_buffer[i].buffer[0] = 0x72|0x80; //Read Fifo count | SPI_READ.
-    }
-    else{
       tx_buffer[i].buffer[0] = 0x74|0x80; //Read the fifo data.
-    }
-    // tx_buffer[i].buffer[0] = i;
-  
   }
-  //Copy for the second fifo dump.
-  //Add one to the location because it skips one. Otherwise we lose the first byte (i.e. the command).
-  memcpy(&tx_buffer[SPI_NUM_BLOCKS+1],&tx_buffer,SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
-  memcpy(&tx_buffer[SPI_NUM_BLOCKS*2+2],&tx_buffer,SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
-  //memcpy(&tx_buffer[SPI_NUM_BLOCKS*3+3],&tx_buffer,SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
-  //MAKE THIS AUTOMATIC!!!!!
 
+  //Copy for the remaining fifo buffers worth of tx buffer.
+  //Add one to the location because it skips one. Otherwise we lose the first byte (i.e. the command).
+  for(int i=0; i<SPI_NUM_FIFO-1;i++){
+
+    memcpy(&tx_buffer[(SPI_NUM_BLOCKS*(i+1))+(i+1)],&tx_buffer,SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
+  }
 
   // //For debugging purpose, print the tx buff. Comment out later!
   // for(int i=0; i < SPI_NUM_BLOCKS*2;i++){
@@ -309,6 +344,13 @@ void DMA_SPI::startRecuringTransfers(){
 
   // Serial.println("Starting recurring transfers...");
   // Serial.flush();
+  enablePPI(true);
+  //Enable the array list feature of SPI DMA.
+  nrf_spim_rx_list_enable(_spim.p_reg);
+  nrf_spim_tx_list_enable(_spim.p_reg);
+
+  //Use 8MHz SPI clock speed.
+  setClock(8);
 
   nrf_spim_rx_buffer_set(_spim.p_reg,&rx_buffer->buffer[0],SPI_BYTES_PER_BLOCK);
   nrf_spim_tx_buffer_set(_spim.p_reg,&tx_buffer->buffer[0],SPI_BYTES_PER_BLOCK);
@@ -317,12 +359,14 @@ void DMA_SPI::startRecuringTransfers(){
   // Serial.flush();
 
   //Start the timer.
-  nrfx_timer_enable(&tim0);
+ nrfx_timer_enable(&tim3);
+ nrfx_timer_clear(&tim3);
 
   // Serial.println("set tim0...");
   // Serial.flush();
   //Start the counter.
   nrfx_timer_enable(&tim1);
+  nrfx_timer_clear(&tim1);
   nrfx_timer_increment(&tim1); //Increment to deal with first time extra byte.
 
   // Serial.println("set tim1...");
@@ -339,7 +383,7 @@ void DMA_SPI::startRecuringTransfers(){
 void DMA_SPI::pauseRecurringTransfers(){
 
   //Start the timer.
-  nrfx_timer_disable(&tim0);
+  nrfx_timer_disable(&tim3);
 
   //Start the counter.
   nrfx_timer_disable(&tim1);
@@ -348,6 +392,11 @@ void DMA_SPI::pauseRecurringTransfers(){
   //Clear and start the tracking counter.
   nrfx_timer_disable(&tim2);
   //nrfx_timer_clear(&tim2);
+
+  enablePPI(false);
+  //Enable the array list feature of SPI DMA.
+  nrf_spim_rx_list_disable(_spim.p_reg);
+  nrf_spim_tx_list_disable(_spim.p_reg);
 
 }
 
@@ -362,6 +411,19 @@ void DMA_SPI::tim1_handler(nrf_timer_event_t event_type, void* p_context){
   
   digitalToggle(PIN_A1);
   //Not really needed for the application but useful for debugging. 
+}
+
+void DMA_SPI::tim3_handler(nrf_timer_event_t event_type, void* p_context){
+
+  
+  digitalToggle(PIN_A0);
+  //Not really needed for the application but useful for debugging. 
+}
+
+void DMA_SPI::gpiote_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action){
+
+  digitalToggle(PIN_A0);
+  Serial.println("IMU Overflow");
 }
 
 uint16_t DMA_SPI::getRxBuffIndex(){
@@ -388,22 +450,86 @@ uint32_t DMA_SPI::getTimeUntilTransfer(){
   }
 }
 
+
+
 void DMA_SPI::getRxData(uint8_t* buff, uint8_t index,uint8_t numCopy){
 
   
   for(int i=0; i<index;i++){
 
-    //   for(int j=0; j<20;j++){
-    //   Serial.printf("%x, ",*(&(rx_buffer[i*(SPI_NUM_BLOCKS+1)].buffer[0])+j));
-    // }
-    // Serial.printf("rx_addr: %x\n\r",&(rx_buffer[i*(SPI_NUM_BLOCKS+1)].buffer[0]));
-    memcpy(&buff[i*SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK],&(rx_buffer[i*(SPI_NUM_BLOCKS+1)].buffer[0]),SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
+  // // for(int i= 0; i<index;i++){
+
+  //     for(int j=0;j<80;j++){
+
+  //       for(int k=0; k<7;k++){
+  //         Serial.printf("%x, ",rx_buffer[j+(80*i)].buffer[k]);
+
+  //       }
+  //       Serial.println(" ");
+  //     }
+
+  //     Serial.println(" ");
+
+    for(int j=0; j<80; j++){
+      
+      //Increment buff index by bytes/block for each sample(j). Then for each frame(i) the buff index just increase by the frame size in bytes.
+      //The rx buff index increses by 1, since rx_buff[x] holds bytes/block bytes. Then for each frame we have to skip one sample, which propagates forward hence the i*80+i.
+      memcpy(&buff[j*SPI_BYTES_PER_BLOCK+i*80*SPI_BYTES_PER_BLOCK],&(rx_buffer[j+(i*80+i)].buffer[0]),SPI_BYTES_PER_BLOCK);
+    }
+
+    // memcpy(&buff[i*SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK],&(rx_buffer[i*(SPI_NUM_BLOCKS+1)].buffer[0]),SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
   }
-  
+
   //Reset our transfers
   nrf_spim_rx_buffer_set(_spim.p_reg,&rx_buffer->buffer[0],SPI_BYTES_PER_BLOCK);
   nrf_spim_tx_buffer_set(_spim.p_reg,&tx_buffer->buffer[0],SPI_BYTES_PER_BLOCK);
 
   nrfx_timer_clear(&tim2);
+  
+  // for(int i= 0; i<index;i++){
+
+  //     for(int j=0;j<80;j++){
+
+  //       for(int k=0; k<7;k++){
+  //         Serial.printf("%x, ",buff[i*SPI_BYTES_PER_BLOCK*SPI_NUM_BLOCKS + j*SPI_BYTES_PER_BLOCK+k]);
+
+  //       }
+  //       Serial.println(" ");
+  //     }
+
+  //     Serial.println(" ");
+  // }
 
 }
+
+
+ void DMA_SPI::enablePPI(bool enable){
+
+   if(enable){
+       //Enable the PPI channels
+      nrfx_err_t err = nrfx_ppi_channel_enable(timerToSpi_PPI_CHAN);
+      // Serial.printf("PPI enable timer to spi: %x\n\r",err);
+      err = nrfx_ppi_channel_enable(gpioteToCounter_PPI_CHAN);
+      // Serial.printf("PPI enable timer to counter: %x\n\r",err);
+      err = nrfx_ppi_channel_enable(SpiToCounter_PPI_CHAN);
+      // Serial.printf("PPI enable spi to counter: %x\n\r",err);
+      err = nrfx_ppi_channel_enable(CounterToSpi_PPI_CHAN);
+      // Serial.printf("PPI enable counter to spi: %x\n\r",err);
+      err = nrfx_ppi_channel_enable(spiToSpi_PPI_CHAN);
+      // Serial.printf("PPI enable spi to spi: %x\n\r",err);  
+   }
+   else{
+       //Disable the PPI channels
+      nrfx_err_t err = nrfx_ppi_channel_disable(timerToSpi_PPI_CHAN);
+      // Serial.printf("PPI enable timer to spi: %x\n\r",err);
+      err = nrfx_ppi_channel_disable(gpioteToCounter_PPI_CHAN);
+      // Serial.printf("PPI enable timer to counter: %x\n\r",err);
+      err = nrfx_ppi_channel_disable(SpiToCounter_PPI_CHAN);
+      // Serial.printf("PPI enable spi to counter: %x\n\r",err);
+      err = nrfx_ppi_channel_disable(CounterToSpi_PPI_CHAN);
+      // Serial.printf("PPI enable counter to spi: %x\n\r",err);
+      err = nrfx_ppi_channel_disable(spiToSpi_PPI_CHAN);
+      // Serial.printf("PPI enable spi to spi: %x\n\r",err);  
+
+   }
+ }
