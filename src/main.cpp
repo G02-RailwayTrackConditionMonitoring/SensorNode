@@ -69,7 +69,7 @@ int16_t acc_z_int[SPI_NUM_BLOCKS/2];
 //Holds the packed data (x,y,z). This is uin8_t now, so we need 40 samples at 6 bytes each.
 uint8_t mergedData[SPI_NUM_BLOCKS/2*6]; 
 
-
+uint8_t testBuff[40*6];
 //Double buffer for sd card.
 typedef enum{
   BUFF_A,
@@ -87,6 +87,7 @@ uint8_t imu_buffer[(SPI_NUM_BLOCKS*SPI_NUM_FIFO*SPI_BYTES_PER_BLOCK)];
 
 //For future use or debugging. 
 uint8_t mode =LOGGING;
+uint32_t tx_count = 0;
 
 //We need a downsampler for each signal.
 Downsampler downsampler_x(2,anitaliasing_filter,FILTER_TAP_NUM,80);
@@ -112,6 +113,11 @@ void setup() {
   digitalWrite(PIN_A1,LOW);
   pinMode(LED_BLUE,OUTPUT);
   pinMode(BUTTON_PIN,INPUT_PULLUP);
+
+  for(int i=0; i<40*6;i++){
+
+    testBuff[i] = i;
+  }
 
   Serial.println("Starting BLE...");
 
@@ -204,7 +210,7 @@ if(mode == LOGGING){
         convert_to_int(acc_x_2khz,acc_x_int,numSamples,IMU.getAccelBiasX_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorX());
         convert_to_int(acc_y_2khz,acc_y_int,numSamples,IMU.getAccelBiasY_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorY());
         convert_to_int(acc_z_2khz,acc_z_int,numSamples,IMU.getAccelBiasZ_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorZ());
-        // Serial.printf("int x0:%d y0:%d z0:%d\r\n",acc_x_int[0],acc_y_int[0],acc_z_int[0]);
+        Serial.printf("%d int x0:%d y0:%d z0:%d\r\n",tx_count,acc_x_int[0],acc_y_int[0],acc_z_int[0]);
 
         //Pack the data into x,y,z for writing to sd card.
         mergeSampleStreams(mergedData, acc_x_int, acc_y_int, acc_z_int,numSamples);
@@ -263,8 +269,9 @@ if(mode == LOGGING){
         }
         
         //Send data over BLE.
-        BLE_Stack.sendData(mergedData,numSamples*6);
-
+        testBuff[0] = tx_count;
+        BLE_Stack.sendData(testBuff,numSamples*6);
+        tx_count++;
         Serial.flush();
       }
     }
@@ -280,7 +287,10 @@ if(mode == LOGGING){
     }
   }
   digitalToggle(LED_BLUE);
-  Serial.println("Test");
+  // Serial.println("Test");
+  // BLE_Stack.sendData(testBuff,240);
+  // Serial.printf("packet: %d \n\r",tx_count);
+  // tx_count++;
   delay(5);
 }
 
