@@ -20,7 +20,7 @@ void NodeBLE::startBLE(String deviceName){
     Bluefruit.setName(deviceName.c_str());
 
     Bluefruit.setTxPower(txPower);
-    //Bluefruit.Periph.setConnInterval(minConnInterval,maxConnInterval);
+    Bluefruit.Periph.setConnInterval(minConnInterval,maxConnInterval);
 
     Bluefruit.Periph.setDisconnectCallback(NodeBLE::disconnectedCallback);
     Bluefruit.Periph.setConnectCallback(NodeBLE::connectedCallback) ;
@@ -88,25 +88,25 @@ bool NodeBLE::sendData(const void* data, uint16_t len){
 
    //Serial.printf("Sending %d bytes\n",len);
    digitalWrite(PIN_A0,HIGH);
-    uint16_t index = 0;
-    while(len>0){
-        uint8_t size = 0;
-        if(len >244){ 
-            size = 244;
+    // uint16_t index = 0;
+    // while(len>0){
+    //     uint8_t size = 0;
+    //     if(len >244){ 
+    //         size = 244;
             
-        }
-        else {
-            size = len;
-        }
+    //     }
+    //     else {
+    //         size = len;
+    //     }
         
-        void* buff = (void*)(((uint8_t*)data)[index]);
+    //     void* buff = (void*)(((uint8_t*)data)[index]);
         bool good = false;
         while(!good){
-          good=  dataStream.notify(buff,size);
+          good=  dataStream.notify(data, len);
         }   
-        index = index + size;
-        len = len-size;
-    }
+        // index = index + size;
+        // len = len-size;
+    // }
     // if(!good){
 
     //     Serial.println("Problem sending data!");

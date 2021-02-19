@@ -23,6 +23,7 @@
         "new": "cpp",
         "nrfx_gpiote.h": "c",
         "nrf_gpiote.h": "c",
-        "nrf_gpio.h": "c"
+        "nrf_gpio.h": "c",
+        "functional": "cpp"
     }
 }
