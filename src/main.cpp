@@ -24,7 +24,7 @@
 #endif
 
 #define LOGGING     1
-
+#define USE_BLE     1
 
 //Pin numbers are MOSI: D13, MISO: D12, SCK:D11, CS: D10
 #define IMU_SPI_MOSI_PIN   7 
@@ -119,6 +119,7 @@ void setup() {
     testBuff[i] = i;
   }
 
+  #ifdef USE_BLE
   Serial.println("Starting BLE...");
 
   #ifdef NODE_1
@@ -133,6 +134,7 @@ void setup() {
     delay(5000);
   } // Wait to be connected.
   delay(10000);//Wait for connectino to be good.
+  #endif
   //Setup SD card with cs pin 2, max Freq 10MHz.
   if(!sd.begin(SdSpiConfig(SD_CS_PIN, SHARED_SPI, SPI_CLOCK))){
     Serial.println("Error initializing SD card...");
@@ -268,11 +270,15 @@ if(mode == LOGGING){
 
         }
         
+        #ifdef USE_BLE
         //Send data over BLE.
         testBuff[0] = tx_count;
-        BLE_Stack.sendData(testBuff,numSamples*6);
+        BLE_Stack.sendData(mergedData,numSamples*6);
         tx_count++;
+        #endif
+        
         Serial.flush();
+
       }
     }
 
