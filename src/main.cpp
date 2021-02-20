@@ -76,10 +76,12 @@ typedef enum{
   BUFF_B
 } BufferSelection_t;
 #define SD_BUFFER_SIZE  512
+#define SD_SYNC_FREQ    12  //The time between syncs is aprox SD_SYNC_FREQ*85/2000; (Since we write every ~85 samples (510 bytes) at 2khz rate).
 BufferSelection_t   sdBuff_selection = BUFF_A; 
 uint16_t            sdBuff_idx=0;
 uint8_t             sdBufferA[SD_BUFFER_SIZE] = {0};
 uint8_t             sdBufferB[SD_BUFFER_SIZE] = {0};
+uint8_t             sdCardWriteCounter = 0;
 
 //For tracking backlog, and storing the local copy of imu data, so that spi dma can reset it's buffers.
 uint8_t imu_num_frames=0;
@@ -247,7 +249,13 @@ if(mode == LOGGING){
               sdBuff_selection = BUFF_B; 
               sdBuff_idx = 0;
 
+
               file.write(sdBufferA,SD_BUFFER_SIZE);
+              sdCardWriteCounter ++;
+              if(sdCardWriteCounter == SD_SYNC_FREQ){
+                file.sync();
+                sdCardWriteCounter = 0;
+              }
               memset(sdBufferA,0,SD_BUFFER_SIZE);
           }
           else if(sdBuff_selection == BUFF_B){
@@ -256,6 +264,11 @@ if(mode == LOGGING){
               sdBuff_idx = 0;
 
               file.write(sdBufferB,SD_BUFFER_SIZE);
+              sdCardWriteCounter ++;
+              if(sdCardWriteCounter == SD_SYNC_FREQ){
+                file.sync();
+                sdCardWriteCounter = 0;
+              }
               memset(sdBufferB,0,SD_BUFFER_SIZE);
           }
 
@@ -272,11 +285,11 @@ if(mode == LOGGING){
         
         #ifdef USE_BLE
         //Send data over BLE.
-        testBuff[0] = tx_count;
+        // testBuff[0] = tx_count;
         BLE_Stack.sendData(mergedData,numSamples*6);
         tx_count++;
         #endif
-        
+
         Serial.flush();
 
       }
