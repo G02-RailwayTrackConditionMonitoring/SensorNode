@@ -479,7 +479,7 @@ void DMA_SPI::getRxData(uint8_t* buff, uint8_t index,uint8_t numCopy){
 
     // memcpy(&buff[i*SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK],&(rx_buffer[i*(SPI_NUM_BLOCKS+1)].buffer[0]),SPI_NUM_BLOCKS*SPI_BYTES_PER_BLOCK);
   }
-
+  //TODO: Make sure we are not in a transfer currently!!!!
   //Reset our transfers
   nrf_spim_rx_buffer_set(_spim.p_reg,&rx_buffer->buffer[0],SPI_BYTES_PER_BLOCK);
   nrf_spim_tx_buffer_set(_spim.p_reg,&tx_buffer->buffer[0],SPI_BYTES_PER_BLOCK);

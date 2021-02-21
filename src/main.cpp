@@ -83,6 +83,9 @@ uint8_t             sdBufferA[SD_BUFFER_SIZE] = {0};
 uint8_t             sdBufferB[SD_BUFFER_SIZE] = {0};
 uint8_t             sdCardWriteCounter = 0;
 
+#define SD_MAX_RETRY  3
+uint8_t sdSetupRetry = 0;
+
 //For tracking backlog, and storing the local copy of imu data, so that spi dma can reset it's buffers.
 uint8_t imu_num_frames=0;
 uint8_t imu_buffer[(SPI_NUM_BLOCKS*SPI_NUM_FIFO*SPI_BYTES_PER_BLOCK)];
@@ -100,6 +103,7 @@ Downsampler downsampler_z(2,anitaliasing_filter,FILTER_TAP_NUM,80);
 void  convert_to_int(float* in, int16_t* out, int num_samples, float bias, float scale, float axis_scale);
 void mergeSampleStreams(uint8_t* outBuff, int16_t* in1, int16_t* in2, int16_t* in3, uint16_t numSamples);
 void test_downsampling();
+int8_t setupSDcard();
 
 void setup() {
 
@@ -121,6 +125,8 @@ void setup() {
     testBuff[i] = i;
   }
 
+  
+
   #ifdef USE_BLE
   Serial.println("Starting BLE...");
 
@@ -137,34 +143,15 @@ void setup() {
   } // Wait to be connected.
   delay(10000);//Wait for connectino to be good.
   #endif
-  //Setup SD card with cs pin 2, max Freq 10MHz.
-  if(!sd.begin(SdSpiConfig(SD_CS_PIN, SHARED_SPI, SPI_CLOCK))){
-    Serial.println("Error initializing SD card...");
-  }
 
-  // create /test on sd if it does not exist
-  if (!sd.exists("/test")) {
-    if (!sd.mkdir("/test")) {
-      Serial.println("SD card cannot find directory '/test', and cannot create it.");
+  //Try setting up sd card. Max 3 times then move on...
+  int8_t res = setupSDcard();
+  if(res<0 ){
+    while(res<0 && sdSetupRetry<SD_MAX_RETRY){
+      res = setupSDcard();
+      sdSetupRetry++;
     }
   }
-  // Make /test the working directory on sd.
-  if (!sd.chdir("test")) {
-     Serial.println("failed changing directory to '/test'");
-  }
-
-  Serial.println(F("------sd-------"));
-  sd.ls("/", LS_R | LS_SIZE);
-
-  Serial.printf("Card size: %f\n",sd.card()->sectorCount()*512E-9);
-
-
-  if (!file.open("test.dat", O_WRONLY | O_CREAT | O_TRUNC)) {
-    Serial.println("open failed");
-  }
-  Serial.flush();
-  
-  delay(2000);
   
   //Order matters here. We want to start the transfers as soon as possible after enabling fifo.
   //So we can setup transfer beforehand.
@@ -190,7 +177,9 @@ if(mode == LOGGING){
       Serial.flush();
       
       //Copy the data from the SPI dma buffer, to our local buffer so we can reset the spi dma buffer.
+      digitalWrite(PIN_A1,HIGH);
       IMU_SPI.getRxData(imu_buffer,imu_num_frames,0);
+      digitalWrite(PIN_A1,LOW);
       Serial.printf("%d frames. \n\r",imu_num_frames);
       
       //Handle  each frame of data that we have.
@@ -310,7 +299,7 @@ if(mode == LOGGING){
   // BLE_Stack.sendData(testBuff,240);
   // Serial.printf("packet: %d \n\r",tx_count);
   // tx_count++;
-  delay(5);
+  delay(1);
 }
 
 void  convert_to_int(float* in, int16_t* out, int num_samples, float bias, float scale, float axis_scale){
@@ -391,4 +380,42 @@ void test_downsampling(){
   inputFile.close();
   file.close();
   Serial.flush();
+}
+
+
+int8_t setupSDcard(){
+
+  //Setup SD card with cs pin 2, max Freq 10MHz.
+  if(!sd.begin(SdSpiConfig(SD_CS_PIN, SHARED_SPI, SPI_CLOCK))){
+    Serial.println("Error initializing SD card...");
+    return -1;
+  }
+
+  // create /test on sd if it does not exist
+  if (!sd.exists("/test")) {
+    if (!sd.mkdir("/test")) {
+      Serial.println("SD card cannot find directory '/test', and cannot create it.");
+      return -2;
+    }
+  }
+  // Make /test the working directory on sd.
+  if (!sd.chdir("test")) {
+     Serial.println("failed changing directory to '/test'");
+     return -3;
+  }
+
+  Serial.println(F("------sd-------"));
+  sd.ls("/", LS_R | LS_SIZE);
+
+  Serial.printf("Card size: %f\n",sd.card()->sectorCount()*512E-9);
+
+
+  if (!file.open("test.dat", O_WRONLY | O_CREAT | O_TRUNC)) {
+    Serial.println("open failed");
+    return -4;
+  }
+  Serial.flush();
+  
+  delay(2000);
+  return 0;
 }

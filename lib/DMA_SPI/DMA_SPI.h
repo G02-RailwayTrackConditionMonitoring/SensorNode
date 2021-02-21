@@ -11,7 +11,7 @@
 #define SPI_NUM_BLOCKS  80 //Fifo holds 85 samples, and the fifo size takes 1 more block.
 #define SPI_BYTES_PER_BLOCK 7   //Each "block" transfers one sample, which is 6 bytes, plus the command.
 #define SPI_BLOCK_DELAY_MS  15  //Fifo takes 21ms to fill, so 20ms is conservative.
-#define SPI_NUM_FIFO        5   //How many FIFOs we can read before we need CPU intervention.
+#define SPI_NUM_FIFO        10   //How many FIFOs we can read before we need CPU intervention.
 
 typedef struct {
 
