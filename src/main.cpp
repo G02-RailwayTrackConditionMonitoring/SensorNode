@@ -140,6 +140,9 @@ void setup() {
     BLE_Stack.startAdvertising();
     Serial.println("Connecting to BLE.");
     delay(5000);
+    if(!BLE_Stack.isConnected()){
+      BLE_Stack.stopAdvertising();
+    }
   } // Wait to be connected.
   delay(10000);//Wait for connectino to be good.
   #endif
@@ -212,7 +215,7 @@ if(mode == LOGGING){
         //Now put data into sd double buffer system, which saves to card if a buffer is full.
 
         //We can fit all the samples in the current buffer.
-        Serial.printf("sd indx:%d\r\n",sdBuff_idx);
+        //Serial.printf("sd indx:%d\r\n",sdBuff_idx);
         if(numSamples*6 + sdBuff_idx<SD_BUFFER_SIZE){
           // Serial.println("single buff");
           if(sdBuff_selection == BUFF_A){

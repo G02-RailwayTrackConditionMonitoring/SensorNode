@@ -84,6 +84,10 @@ void NodeBLE::startAdvertising(){
     Bluefruit.Advertising.start(totalTimeout);
 }
 
+void NodeBLE::stopAdvertising(){
+    Bluefruit.Advertising.stop();
+}
+
 bool NodeBLE::sendData(const void* data, uint16_t len){
 
    //Serial.printf("Sending %d bytes\n",len);

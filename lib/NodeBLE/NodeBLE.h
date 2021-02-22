@@ -18,6 +18,7 @@ class NodeBLE{
    
         void startBLE(String deviceName);
         void startAdvertising();
+        void stopAdvertising();
         bool sendData(const void* data, uint16_t len);
         bool sendTelemetry(const void* data, uint16_t len);
         uint8_t  isConnected();
