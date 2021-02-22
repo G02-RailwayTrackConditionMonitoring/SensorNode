@@ -102,6 +102,8 @@ private:
     //Handler for timer 0.
     static void tim0_handler(nrf_timer_event_t event_type, void* p_context);
 
+    static void tim2_handler(nrf_timer_event_t event_type, void* p_context);
+
     //Handler for timer 1.
     static void tim1_handler(nrf_timer_event_t event_type, void* p_context);
 

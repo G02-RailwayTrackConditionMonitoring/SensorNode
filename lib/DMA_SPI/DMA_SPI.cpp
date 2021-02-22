@@ -214,10 +214,13 @@ void DMA_SPI::setup_tracking_counter(){
   cfg.bit_width = NRF_TIMER_BIT_WIDTH_16;
   cfg.p_context = this;
 
-  nrfx_err_t err = nrfx_timer_init(&tim2,&cfg,NULL);
+  nrfx_err_t err = nrfx_timer_init(&tim2,&cfg,tim2_handler);
   Serial.printf("Counter setup error: %x\n\r",err);
   Serial.flush();
 
+  //This is a failsafe for if we overflow the buffer. The handler clears the buffer and resets the spi buffers.
+  ///This will cause us to lose the data, but it prevents the fifo from going out of sync, which would probably need a reset to deal with.
+  nrfx_timer_extended_compare(&tim2, NRF_TIMER_CC_CHANNEL1,SPI_NUM_BLOCKS*SPI_NUM_FIFO,NRF_TIMER_SHORT_COMPARE1_STOP_MASK,true);
 
 }
 
@@ -419,11 +422,25 @@ void DMA_SPI::tim3_handler(nrf_timer_event_t event_type, void* p_context){
   digitalToggle(PIN_A0);
   //Not really needed for the application but useful for debugging. 
 }
+void DMA_SPI::tim2_handler(nrf_timer_event_t event_type, void* p_context){
+  
+  //This is a failsafe for if we overflow the buffer. It clears the buffer and resets the spi buffers.
+  ///This will cause us to lose the data, but it prevents the fifo from going out of sync, which would probably need a reset to deal with.
+  DMA_SPI* dma = (DMA_SPI*)p_context;
+  Serial.println("DMA buffer Overflow... Reseting buffer.");
+  Serial.printf("tim2 count:%d\n\r",nrfx_timer_capture(&(dma->tim2), NRF_TIMER_CC_CHANNEL0));
+  Serial.flush();
+  nrf_spim_rx_buffer_set(dma->_spim.p_reg,&(dma->rx_buffer->buffer[0]),SPI_BYTES_PER_BLOCK);
+  nrf_spim_tx_buffer_set(dma->_spim.p_reg,&(dma->tx_buffer->buffer[0]),SPI_BYTES_PER_BLOCK);
+
+  nrfx_timer_clear(&(dma->tim2));
+  nrfx_timer_enable(&(dma->tim2));
+}
 
 void DMA_SPI::gpiote_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action){
 
-  digitalToggle(PIN_A0);
-  Serial.println("IMU Overflow");
+  // digitalToggle(PIN_A0);
+  
 }
 
 uint16_t DMA_SPI::getRxBuffIndex(){
@@ -456,19 +473,6 @@ void DMA_SPI::getRxData(uint8_t* buff, uint8_t index,uint8_t numCopy){
 
   
   for(int i=0; i<index;i++){
-
-  // // for(int i= 0; i<index;i++){
-
-  //     for(int j=0;j<80;j++){
-
-  //       for(int k=0; k<7;k++){
-  //         Serial.printf("%x, ",rx_buffer[j+(80*i)].buffer[k]);
-
-  //       }
-  //       Serial.println(" ");
-  //     }
-
-  //     Serial.println(" ");
 
     for(int j=0; j<80; j++){
       
