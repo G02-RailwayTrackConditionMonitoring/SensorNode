@@ -104,9 +104,11 @@ bool NodeBLE::sendData(const void* data, uint16_t len){
     //     }
         
     //     void* buff = (void*)(((uint8_t*)data)[index]);
+    uint32_t retries = 0;
         bool good = false;
-        while(!good){
+        while(!good && (retries < BLE_NUM_RETRY)){
           good=  dataStream.notify(data, len);
+          retries++;
         }   
         // index = index + size;
         // len = len-size;

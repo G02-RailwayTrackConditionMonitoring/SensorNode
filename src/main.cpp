@@ -66,8 +66,8 @@ int16_t acc_x_int[SPI_NUM_BLOCKS/2];
 int16_t acc_y_int[SPI_NUM_BLOCKS/2];
 int16_t acc_z_int[SPI_NUM_BLOCKS/2];
 
-//Holds the packed data (x,y,z). This is uin8_t now, so we need 40 samples at 6 bytes each.
-uint8_t mergedData[SPI_NUM_BLOCKS/2*6]; 
+//Holds the packed data (x,y,z). This is uin8_t now, so we need 40 samples at 6 bytes each. Add 4 for the frame count, since we also send ble from this buffer.
+uint8_t mergedData[SPI_NUM_BLOCKS/2*6+4]; 
 
 uint8_t testBuff[40*6];
 //Double buffer for sd card.
@@ -89,6 +89,8 @@ uint8_t sdSetupRetry = 0;
 //For tracking backlog, and storing the local copy of imu data, so that spi dma can reset it's buffers.
 uint8_t imu_num_frames=0;
 uint8_t imu_buffer[(SPI_NUM_BLOCKS*SPI_NUM_FIFO*SPI_BYTES_PER_BLOCK)];
+
+uint32_t frameCounter=0;
 
 //For future use or debugging. 
 uint8_t mode =LOGGING;
@@ -278,10 +280,16 @@ if(mode == LOGGING){
         #ifdef USE_BLE
         //Send data over BLE.
         // testBuff[0] = tx_count;
-        BLE_Stack.sendData(mergedData,numSamples*6);
-        tx_count++;
+        if(BLE_Stack.isConnected()){
+          uint32_t* ptr = (uint32_t*)&mergedData[240];
+          *ptr = frameCounter;
+          BLE_Stack.sendData(mergedData,numSamples*6+4);
+          tx_count++;
+       }
         #endif
 
+        //We have processed one frame.
+        frameCounter++;
         Serial.flush();
 
       }
