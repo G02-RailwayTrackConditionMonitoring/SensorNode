@@ -101,6 +101,8 @@ Downsampler downsampler_x(2,anitaliasing_filter,FILTER_TAP_NUM,80);
 Downsampler downsampler_y(2,anitaliasing_filter,FILTER_TAP_NUM,80);
 Downsampler downsampler_z(2,anitaliasing_filter,FILTER_TAP_NUM,80);
 
+uint32_t bleScanTimePrev = 0;
+
 //Local function declarations.
 void  convert_to_int(float* in, int16_t* out, int num_samples, float bias, float scale, float axis_scale);
 void mergeSampleStreams(uint8_t* outBuff, int16_t* in1, int16_t* in2, int16_t* in3, uint16_t numSamples);
@@ -305,6 +307,20 @@ if(mode == LOGGING){
       while(1){};
     }
   }
+
+  //If were not connected, try scanning evry 5 seconds.
+  if(!BLE_Stack.isConnected()){
+
+    uint32_t bleScanTime = millis();
+
+    if(bleScanTime-bleScanTimePrev > 5000){
+      BLE_Stack.stopAdvertising();
+      BLE_Stack.startAdvertising();
+
+      bleScanTimePrev = bleScanTime;
+    }
+  }
+
   digitalToggle(LED_BLUE);
   // Serial.println("Test");
   // BLE_Stack.sendData(testBuff,240);
