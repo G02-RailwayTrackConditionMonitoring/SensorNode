@@ -107,9 +107,10 @@ bool NodeBLE::sendData(const void* data, uint16_t len){
     uint32_t retries = 0;
         bool good = dataStream.notify(data, len);;
         while(!good && (retries < BLE_NUM_RETRY)){
-          Serial.println("ble f");
+          //Serial.println("ble f");
           good=  dataStream.notify(data, len);
           retries++;
+          delay_ns(100);
         }   
         if(retries == BLE_NUM_RETRY && !good){
             Serial.println("dropped frame");

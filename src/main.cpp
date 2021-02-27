@@ -113,8 +113,12 @@ void setup() {
 
   // serial to display data
   Serial.begin(115200);
-  while(!Serial) {}
-  delay(5000);
+  uint8_t count =0;
+  while(!Serial && count < 5) {
+    count++;
+    delay(1000);
+  }
+  //delay(5000);
   
   //Pin for debuugging BLE. Goes high when in sendData function.
   pinMode(PIN_A0,OUTPUT);
@@ -145,14 +149,16 @@ void setup() {
   #endif
   
   while(!BLE_Stack.isConnected()){
+    digitalWrite(LED_BLUE,HIGH);
     BLE_Stack.startAdvertising();
     Serial.println("Connecting to BLE.");
     delay(5000);
+    digitalWrite(LED_BLUE,LOW);
     if(!BLE_Stack.isConnected()){
       BLE_Stack.stopAdvertising();
     }
   } // Wait to be connected.
-  delay(10000);//Wait for connectino to be good.
+  delay(5000);//Wait for connectino to be good.
   #endif
 
   //Try setting up sd card. Max 3 times then move on...
