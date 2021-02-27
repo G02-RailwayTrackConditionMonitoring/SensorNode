@@ -91,7 +91,7 @@ void NodeBLE::stopAdvertising(){
 bool NodeBLE::sendData(const void* data, uint16_t len){
 
    //Serial.printf("Sending %d bytes\n",len);
-   digitalWrite(PIN_A0,HIGH);
+    //digitalWrite(PIN_A2,HIGH);
     // uint16_t index = 0;
     // while(len>0){
     //     uint8_t size = 0;
@@ -105,11 +105,15 @@ bool NodeBLE::sendData(const void* data, uint16_t len){
         
     //     void* buff = (void*)(((uint8_t*)data)[index]);
     uint32_t retries = 0;
-        bool good = false;
+        bool good = dataStream.notify(data, len);;
         while(!good && (retries < BLE_NUM_RETRY)){
+          Serial.println("ble f");
           good=  dataStream.notify(data, len);
           retries++;
         }   
+        if(retries == BLE_NUM_RETRY && !good){
+            Serial.println("dropped frame");
+        }
         // index = index + size;
         // len = len-size;
     // }
@@ -121,7 +125,7 @@ bool NodeBLE::sendData(const void* data, uint16_t len){
     //  int16_t connHandle = Bluefruit.connHandle();
     //  BLEConnection* connection = Bluefruit.Connection(connHandle);
     //  connection->waitForIndicateConfirm();
-    digitalWrite(PIN_A0,LOW);
+    //digitalWrite(PIN_A2,LOW);
     return true;
     //This freezes up. Could look into it later dont know if it is neccesssry.
 }

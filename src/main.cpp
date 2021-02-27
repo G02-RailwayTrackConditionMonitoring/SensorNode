@@ -87,7 +87,7 @@ uint8_t             sdCardWriteCounter = 0;
 uint8_t sdSetupRetry = 0;
 
 //For tracking backlog, and storing the local copy of imu data, so that spi dma can reset it's buffers.
-uint8_t imu_num_frames=0;
+uint16_t imu_num_frames=0;
 uint8_t imu_buffer[(SPI_NUM_BLOCKS*SPI_NUM_FIFO*SPI_BYTES_PER_BLOCK)];
 
 uint32_t frameCounter=0;
@@ -121,6 +121,10 @@ void setup() {
   digitalWrite(PIN_A0,LOW);
   pinMode(PIN_A1,OUTPUT);
   digitalWrite(PIN_A1,LOW);
+  pinMode(PIN_A2,OUTPUT);
+  digitalWrite(PIN_A2,LOW);
+  pinMode(PIN_A3,OUTPUT);
+  digitalWrite(PIN_A3,LOW);
   pinMode(LED_BLUE,OUTPUT);
   pinMode(BUTTON_PIN,INPUT_PULLUP);
 
@@ -175,20 +179,25 @@ void setup() {
 void loop(){
 
 if(mode == LOGGING){
-
-    //Check if we have any frames available
-    if((imu_num_frames = IMU_SPI.getRxBuffIndex())){
-
+    //digitalToggle(PIN_A3);
+    uint32_t ttt = IMU_SPI.getTimeUntilTransfer();
+    if( ttt>4 && ttt<76){
+    imu_num_frames = IMU_SPI.getRxBuffIndex();
+    //Serial.printf("buf_idx:%d\n\r",imu_num_frames);
+    //Check if we have any frames available, also should be mulitple of 81 or else we are in middle of reading frame.
+    if((imu_num_frames/80)>0 && (imu_num_frames%81 == 0) ){
+      imu_num_frames = imu_num_frames/80;
       // digitalWrite(PIN_A0,HIGH);
-      Serial.printf("reading imu:");
-      Serial.flush();
+      //Serial.printf("reading imu:");
+      //Serial.flush();
       
       //Copy the data from the SPI dma buffer, to our local buffer so we can reset the spi dma buffer.
-      digitalWrite(PIN_A1,HIGH);
+      digitalWrite(PIN_A0,HIGH);
       IMU_SPI.getRxData(imu_buffer,imu_num_frames,0);
-      digitalWrite(PIN_A1,LOW);
-      Serial.printf("%d frames. \n\r",imu_num_frames);
       
+        Serial.printf("%d frames. \n\r",imu_num_frames);
+      digitalWrite(PIN_A0,LOW);
+      digitalWrite(PIN_A2,HIGH);
       //Handle  each frame of data that we have.
       for(int frameNum=0; frameNum<imu_num_frames; frameNum++){
         
@@ -282,11 +291,13 @@ if(mode == LOGGING){
         #ifdef USE_BLE
         //Send data over BLE.
         // testBuff[0] = tx_count;
+        digitalWrite(PIN_A3,HIGH);
         if(BLE_Stack.isConnected()){
           uint32_t* ptr = (uint32_t*)&mergedData[240];
           *ptr = frameCounter;
           BLE_Stack.sendData(mergedData,numSamples*6+4);
           tx_count++;
+          digitalWrite(PIN_A3,LOW);
        }
         #endif
 
@@ -295,6 +306,8 @@ if(mode == LOGGING){
         Serial.flush();
 
       }
+      
+      digitalWrite(PIN_A2,LOW);
     }
 
     if(digitalRead(BUTTON_PIN) == LOW ){
@@ -307,10 +320,10 @@ if(mode == LOGGING){
       while(1){};
     }
   }
-
+}
   //If were not connected, try scanning evry 5 seconds.
   if(!BLE_Stack.isConnected()){
-
+    Serial.println("Reconnecting BLE...");
     uint32_t bleScanTime = millis();
 
     if(bleScanTime-bleScanTimePrev > 5000){

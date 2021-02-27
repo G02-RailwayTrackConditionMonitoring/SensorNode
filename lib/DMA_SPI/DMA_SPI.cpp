@@ -220,7 +220,7 @@ void DMA_SPI::setup_tracking_counter(){
 
   //This is a failsafe for if we overflow the buffer. The handler clears the buffer and resets the spi buffers.
   ///This will cause us to lose the data, but it prevents the fifo from going out of sync, which would probably need a reset to deal with.
-  nrfx_timer_extended_compare(&tim2, NRF_TIMER_CC_CHANNEL1,SPI_NUM_BLOCKS*SPI_NUM_FIFO,NRF_TIMER_SHORT_COMPARE1_STOP_MASK,true);
+  nrfx_timer_extended_compare(&tim2, NRF_TIMER_CC_CHANNEL1,(SPI_NUM_BLOCKS)*(SPI_NUM_FIFO-1)+(SPI_NUM_FIFO-1),NRF_TIMER_SHORT_COMPARE1_STOP_MASK,true);
 
 }
 
@@ -331,7 +331,7 @@ void DMA_SPI::setupReccuringTransfer(){
   }
 
   // //For debugging purpose, print the tx buff. Comment out later!
-  // for(int i=0; i < SPI_NUM_BLOCKS*2;i++){
+  // for(int i=0; i < SPI_NUM_BLOCKS*SPI_NUM_FIFO;i++){
   //   Serial.printf("%d: ",i);
   //   for(int j=0; j< SPI_BYTES_PER_BLOCK; j++){
 
@@ -423,18 +423,21 @@ void DMA_SPI::tim3_handler(nrf_timer_event_t event_type, void* p_context){
   //Not really needed for the application but useful for debugging. 
 }
 void DMA_SPI::tim2_handler(nrf_timer_event_t event_type, void* p_context){
-  
+  digitalWrite(PIN_A1,HIGH);
   //This is a failsafe for if we overflow the buffer. It clears the buffer and resets the spi buffers.
   ///This will cause us to lose the data, but it prevents the fifo from going out of sync, which would probably need a reset to deal with.
+  
   DMA_SPI* dma = (DMA_SPI*)p_context;
+
   Serial.println("DMA buffer Overflow... Reseting buffer.");
-  Serial.printf("tim2 count:%d\n\r",nrfx_timer_capture(&(dma->tim2), NRF_TIMER_CC_CHANNEL0));
+  Serial.printf("tim2 count:%d, getrx:%d \n\r",nrfx_timer_capture(&(dma->tim2), NRF_TIMER_CC_CHANNEL0),dma->getRxBuffIndex());
   Serial.flush();
   nrf_spim_rx_buffer_set(dma->_spim.p_reg,&(dma->rx_buffer->buffer[0]),SPI_BYTES_PER_BLOCK);
   nrf_spim_tx_buffer_set(dma->_spim.p_reg,&(dma->tx_buffer->buffer[0]),SPI_BYTES_PER_BLOCK);
 
   nrfx_timer_clear(&(dma->tim2));
   nrfx_timer_enable(&(dma->tim2));
+  digitalWrite(PIN_A1,LOW);
 }
 
 void DMA_SPI::gpiote_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action){
@@ -447,7 +450,7 @@ uint16_t DMA_SPI::getRxBuffIndex(){
 
   if(nrfx_timer_is_enabled(&tim2)){
 
-  return nrfx_timer_capture(&tim2, NRF_TIMER_CC_CHANNEL0)/SPI_NUM_BLOCKS;
+  return nrfx_timer_capture(&tim2, NRF_TIMER_CC_CHANNEL0);
   }
   else{
     
@@ -457,9 +460,9 @@ uint16_t DMA_SPI::getRxBuffIndex(){
 
 uint32_t DMA_SPI::getTimeUntilTransfer(){
 
-    if(nrfx_timer_is_enabled(&tim2)){
+    if(nrfx_timer_is_enabled(&tim3)){
 
-  return (SPI_BLOCK_DELAY_MS*8000) - nrfx_timer_capture(&tim0, NRF_TIMER_CC_CHANNEL1)/8; // Clock is at 8MHz so each count is 1/8 of a us.
+  return (SPI_NUM_BLOCKS) - nrfx_timer_capture(&tim3, NRF_TIMER_CC_CHANNEL1); 
   }
   else{
     
@@ -489,7 +492,7 @@ void DMA_SPI::getRxData(uint8_t* buff, uint8_t index,uint8_t numCopy){
   nrf_spim_tx_buffer_set(_spim.p_reg,&tx_buffer->buffer[0],SPI_BYTES_PER_BLOCK);
 
   nrfx_timer_clear(&tim2);
-  
+  nrfx_timer_enable(&tim2);
   // for(int i= 0; i<index;i++){
 
   //     for(int j=0;j<80;j++){
