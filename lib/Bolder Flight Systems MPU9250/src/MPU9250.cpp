@@ -46,8 +46,12 @@ int MPU9250::init(){
 
    //Reset device
   writeRegisterBlocking(PWR_MGMNT_1,0x80);
-
   delay(100);
+  writeRegisterBlocking(0x68,0x03);//Reset signal path
+  delay(100);
+  writeRegisterBlocking(0x6A,0x01);
+  delay(100);
+
 
   // Select clock source to PLL gyro reference once stable
   writeRegisterBlocking(PWR_MGMNT_1,CLOCK_SEL_PLL);
