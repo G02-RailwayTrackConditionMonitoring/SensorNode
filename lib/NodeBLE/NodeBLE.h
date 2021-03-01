@@ -10,7 +10,7 @@
 #endif
 
 
-#define BLE_NUM_RETRY   50 //No clue what this should be set to...
+#define BLE_NUM_RETRY   25 //No clue what this should be set to...
 
 class NodeBLE{
 
