@@ -41,6 +41,9 @@ int status;
 //Sd card object with FAT32 filesystem
 SdExFat sd;
 ExFatFile file;
+ExFatFile indexFile;
+uint16_t runIndex = 0;
+
 #define SPI_CLOCK SD_SCK_MHZ(50)
 #define SD_CS_PIN 2
 
@@ -449,14 +452,42 @@ int8_t setupSDcard(){
      Serial.println("failed changing directory to '/test'");
      return -3;
   }
+  Serial.println(F("------sd-------"));
+  sd.ls("/", LS_R | LS_SIZE);
+
+  if(!indexFile.open("index.txt",O_RDWR)){
+    
+    if(!indexFile.open("index.txt",O_CREAT|O_WRONLY)){
+      Serial.println("Could not create index.txt!");
+    }
+    else{
+      Serial.println("Could not find index.txt... Creating...");
+      char init[5] = "1\n";
+      indexFile.write(init,strlen(init));
+      indexFile.flush();
+      indexFile.close();
+    }
+  }
+  else{
+    char num[10];
+    indexFile.fgets(num,10);
+    runIndex = atoi(num);
+    Serial.printf("run Index:%d (%s)",runIndex,num);
+    indexFile.seekSet(0);
+    snprintf(num,10,"%d\n",runIndex+1);
+    indexFile.write(num,strlen(num));
+    indexFile.flush();
+    indexFile.close();
+  }
 
   Serial.println(F("------sd-------"));
   sd.ls("/", LS_R | LS_SIZE);
 
   Serial.printf("Card size: %f\n",sd.card()->sectorCount()*512E-9);
 
-
-  if (!file.open("test.dat", O_WRONLY | O_CREAT | O_TRUNC)) {
+  char path[15];
+  snprintf(path,15,"run%d.dat",runIndex);
+  if (!file.open(path, O_WRONLY | O_CREAT | O_TRUNC)) {
     Serial.println("open failed");
     return -4;
   }
