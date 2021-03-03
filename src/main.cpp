@@ -191,7 +191,7 @@ void loop(){
     uint8_t cmd = BLE_Stack.lastCommand;
     BLE_Stack.commandReceived = 0;
     
-    if(cmd == 0x55 && mode != LOGGING){
+    if(cmd == 0x01 && mode != LOGGING){
       mode = LOGGING;
       
     //Order matters here. We want to start the transfers as soon as possible after enabling fifo.
@@ -202,7 +202,7 @@ void loop(){
     IMU_SPI.startRecuringTransfers();
 
     }
-    else if (cmd == 0xAA && mode != 0){
+    else if (cmd == 0x00 && mode != 0){
       mode = 0;
       
       IMU_SPI.pauseRecurringTransfers();
