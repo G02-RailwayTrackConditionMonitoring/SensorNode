@@ -30,6 +30,9 @@ class NodeBLE{
         uint16_t getMTU();
         uint16_t getConnInterval();
 
+        uint8_t lastCommand = 0;
+        uint8_t commandReceived = 0;
+        
         void runBenchmark1(uint16_t packetSize,uint32_t numPackets);
         void runBenchmark2(uint16_t packetSize,uint32_t numPackets);
         void runBenchmark3(uint32_t numBytes);

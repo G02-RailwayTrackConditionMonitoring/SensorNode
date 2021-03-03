@@ -96,7 +96,7 @@ uint8_t imu_buffer[(SPI_NUM_BLOCKS*SPI_NUM_FIFO*SPI_BYTES_PER_BLOCK)];
 uint32_t frameCounter=0;
 
 //For future use or debugging. 
-uint8_t mode =LOGGING;
+uint8_t mode =0;
 uint32_t tx_count = 0;
 
 //We need a downsampler for each signal.
@@ -173,12 +173,7 @@ void setup() {
     }
   }
   
-  //Order matters here. We want to start the transfers as soon as possible after enabling fifo.
-  //So we can setup transfer beforehand.
-  IMU_SPI.setupReccuringTransfer();
-  IMU.init(); // start communication with IMU   
-  IMU.enableAccelFifo(); // enabling the FIFO to record just the accelerometers
-  IMU_SPI.startRecuringTransfers();
+
 
   Serial.println("Starting test");
   Serial.flush();
@@ -186,6 +181,27 @@ void setup() {
 }
   //Loop
 void loop(){
+
+  if(BLE_Stack.commandReceived){
+    uint8_t cmd = BLE_Stack.lastCommand;
+    if(cmd == 0x55){
+      mode = LOGGING;
+      BLE_Stack.commandReceived = 0;
+
+        //Order matters here. We want to start the transfers as soon as possible after enabling fifo.
+        //So we can setup transfer beforehand.
+        IMU_SPI.setupReccuringTransfer();
+        IMU.init(); // start communication with IMU   
+        IMU.enableAccelFifo(); // enabling the FIFO to record just the accelerometers
+        IMU_SPI.startRecuringTransfers();
+    }
+    else if (cmd == 0xAA){
+      mode = 0;
+      BLE_Stack.commandReceived = 0;
+      IMU_SPI.pauseRecurringTransfers();
+      IMU.haltSampleAccumulation();
+    }
+  }
 
 if(mode == LOGGING){
     //digitalToggle(PIN_A3);
@@ -228,7 +244,7 @@ if(mode == LOGGING){
         convert_to_int(acc_x_2khz,acc_x_int,numSamples,IMU.getAccelBiasX_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorX());
         convert_to_int(acc_y_2khz,acc_y_int,numSamples,IMU.getAccelBiasY_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorY());
         convert_to_int(acc_z_2khz,acc_z_int,numSamples,IMU.getAccelBiasZ_mss(),IMU.getAccelScaleFactor(),IMU.getAccelScaleFactorZ());
-        Serial.printf("%d int x0:%d y0:%d z0:%d\r\n",tx_count,acc_x_int[0],acc_y_int[0],acc_z_int[0]);
+        Serial.printf("%d int x0:%d y0:%d z0:%d\r\n",tx_count,acc_x_int[20],acc_y_int[20],acc_z_int[20]);
 
         //Pack the data into x,y,z for writing to sd card.
         mergeSampleStreams(mergedData, acc_x_int, acc_y_int, acc_z_int,numSamples);

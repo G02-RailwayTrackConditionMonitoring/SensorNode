@@ -236,5 +236,7 @@ void NodeBLE::disconnectedCallback(uint16_t conn_handle, uint8_t reason){
 void NodeBLE::commandRxCallback(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t* data, uint16_t len){
 
     Serial.printf("Received Command: %s.\n",data);
+    BLE_Stack.lastCommand = data[0];
+    BLE_Stack.commandReceived = 1;
 }
         
