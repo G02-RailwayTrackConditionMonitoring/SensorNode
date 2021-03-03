@@ -196,7 +196,7 @@ void loop(){
       
     //Order matters here. We want to start the transfers as soon as possible after enabling fifo.
     //So we can setup transfer beforehand.
-    IMU_SPI.setupReccuringTransfer();
+    //IMU_SPI.setupReccuringTransfer();
     IMU.init(); // start communication with IMU   
     IMU.enableAccelFifo(); // enabling the FIFO to record just the accelerometers
     IMU_SPI.startRecuringTransfers();
