@@ -353,6 +353,8 @@ if(mode == LOGGING){
     }
   }
 }
+
+#ifdef USE_BLE
   //If were not connected, try scanning evry 5 seconds.
   if(!BLE_Stack.isConnected()){
     Serial.println("Reconnecting BLE...");
@@ -365,7 +367,7 @@ if(mode == LOGGING){
       bleScanTimePrev = bleScanTime;
     }
   }
-
+#endif
   digitalToggle(LED_BLUE);
   // Serial.println("Test");
   // BLE_Stack.sendData(testBuff,240);
