@@ -96,7 +96,7 @@ uint8_t imu_buffer[(SPI_NUM_BLOCKS*SPI_NUM_FIFO*SPI_BYTES_PER_BLOCK)];
 uint32_t frameCounter=0;
 
 //For future use or debugging. 
-uint8_t mode =0;
+uint8_t mode =LOGGING;
 uint32_t tx_count = 0;
 
 //We need a downsampler for each signal.
@@ -173,7 +173,12 @@ void setup() {
     }
   }
   
-
+  //Order matters here. We want to start the transfers as soon as possible after enabling fifo.
+  //So we can setup transfer beforehand.
+  IMU_SPI.setupReccuringTransfer();
+  IMU.init(); // start communication with IMU   
+  IMU.enableAccelFifo(); // enabling the FIFO to record just the accelerometers
+  IMU_SPI.startRecuringTransfers();
 
   Serial.println("Starting test");
   Serial.flush();
@@ -184,20 +189,22 @@ void loop(){
 
   if(BLE_Stack.commandReceived){
     uint8_t cmd = BLE_Stack.lastCommand;
-    if(cmd == 0x55){
+    BLE_Stack.commandReceived = 0;
+    
+    if(cmd == 0x55 && mode != LOGGING){
       mode = LOGGING;
-      BLE_Stack.commandReceived = 0;
+      
+    //Order matters here. We want to start the transfers as soon as possible after enabling fifo.
+    //So we can setup transfer beforehand.
+    IMU_SPI.setupReccuringTransfer();
+    IMU.init(); // start communication with IMU   
+    IMU.enableAccelFifo(); // enabling the FIFO to record just the accelerometers
+    IMU_SPI.startRecuringTransfers();
 
-        //Order matters here. We want to start the transfers as soon as possible after enabling fifo.
-        //So we can setup transfer beforehand.
-        IMU_SPI.setupReccuringTransfer();
-        IMU.init(); // start communication with IMU   
-        IMU.enableAccelFifo(); // enabling the FIFO to record just the accelerometers
-        IMU_SPI.startRecuringTransfers();
     }
-    else if (cmd == 0xAA){
+    else if (cmd == 0xAA && mode != 0){
       mode = 0;
-      BLE_Stack.commandReceived = 0;
+      
       IMU_SPI.pauseRecurringTransfers();
       IMU.haltSampleAccumulation();
     }
